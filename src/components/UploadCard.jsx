@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Upload, FileCheck, Copy, Loader2, Link as LinkIcon, 
-  AlertCircle, X, Plus, Mail, MessageSquare, CheckCircle2, Clock, Send 
+import {
+  Upload, FileCheck, Copy, Loader2, Link as LinkIcon,
+  AlertCircle, X, Plus, Mail, MessageSquare, CheckCircle2, Clock, Send
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = 'https://drop-involve-backend.onrender.com';
 
 const UploadCard = () => {
   const [file, setFile] = useState(null);
@@ -15,10 +15,10 @@ const UploadCard = () => {
   const [downloadUrl, setDownloadUrl] = useState('');
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
-  
+
   const [emailTo, setEmailTo] = useState('');
   const [message, setMessage] = useState('');
-  const [expiry, setExpiry] = useState(7); 
+  const [expiry, setExpiry] = useState(7);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -110,13 +110,13 @@ const UploadCard = () => {
       {/* Transfer Mode Toggle */}
       {status === 'IDLE' && (
         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 mb-2">
-          <button 
+          <button
             onClick={() => setTransferMode('EMAIL')}
             className={`px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${transferMode === 'EMAIL' ? 'bg-brand text-black' : 'text-slate-400 hover:text-white'}`}
           >
             <Send size={16} /> Send e-post
           </button>
-          <button 
+          <button
             onClick={() => setTransferMode('LINK')}
             className={`px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${transferMode === 'LINK' ? 'bg-brand text-black' : 'text-slate-400 hover:text-white'}`}
           >
@@ -125,11 +125,10 @@ const UploadCard = () => {
         </div>
       )}
 
-      <motion.div 
+      <motion.div
         layout
-        className={`w-full bg-[#030712] border-2 rounded-[2rem] p-8 md:p-12 flex flex-col items-center justify-center transition-all duration-300 relative overflow-hidden min-h-[450px] ${
-          isDragging ? 'border-brand shadow-[0_0_50px_-12px_rgba(244,254,139,0.3)]' : 'border-white/10'
-        }`}
+        className={`w-full bg-[#030712] border-2 rounded-[2rem] p-8 md:p-12 flex flex-col items-center justify-center transition-all duration-300 relative overflow-hidden min-h-[450px] ${isDragging ? 'border-brand shadow-[0_0_50px_-12px_rgba(244,254,139,0.3)]' : 'border-white/10'
+          }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -161,15 +160,15 @@ const UploadCard = () => {
               <div className="flex-1 w-full space-y-4">
                 <AnimatePresence mode="popLayout">
                   {transferMode === 'EMAIL' && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                       className="relative"
                     >
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                      <input 
-                        type="email" 
+                      <input
+                        type="email"
                         placeholder="Send til (valgfritt)"
                         value={emailTo}
                         onChange={(e) => setEmailTo(e.target.value)}
@@ -178,10 +177,10 @@ const UploadCard = () => {
                     </motion.div>
                   )}
                 </AnimatePresence>
-                
+
                 <div className="relative">
                   <MessageSquare className="absolute left-4 top-4 text-slate-500" size={18} />
-                  <textarea 
+                  <textarea
                     placeholder="Din melding"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
@@ -192,7 +191,7 @@ const UploadCard = () => {
                 <div className="flex items-center gap-4">
                   <div className="flex-1 relative">
                     <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                    <select 
+                    <select
                       value={expiry}
                       onChange={(e) => setExpiry(Number(e.target.value))}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white appearance-none focus:outline-none focus:border-brand/50 transition-all cursor-pointer"
@@ -220,9 +219,9 @@ const UploadCard = () => {
               </div>
               <h3 className="text-2xl font-bold text-white mb-2">Overfører...</h3>
               <p className="text-slate-400 mb-8 truncate w-full text-center">{file?.name}</p>
-              
+
               <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden mb-4">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: "70%" }}
                   className="h-full bg-brand shadow-[0_0_20px_rgba(244,254,139,0.4)]"
@@ -250,7 +249,7 @@ const UploadCard = () => {
               <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-6 mb-8 flex items-center gap-4">
                 <LinkIcon size={24} className="text-brand shrink-0" />
                 <p className="text-slate-200 text-base truncate flex-1 font-mono">{downloadUrl}</p>
-                <button 
+                <button
                   onClick={copyToClipboard}
                   className="p-3 hover:bg-brand/10 rounded-xl text-brand transition-colors"
                 >
@@ -258,7 +257,7 @@ const UploadCard = () => {
                 </button>
               </div>
 
-              <button 
+              <button
                 onClick={reset}
                 className="text-slate-400 hover:text-white transition-colors flex items-center gap-2 font-bold"
               >
@@ -279,8 +278,8 @@ const UploadCard = () => {
               </div>
               <h3 className="text-2xl font-bold text-white mb-2">Noe gikk galt</h3>
               <p className="text-rose-400/80 text-center mb-10">{error || 'Kunne ikke fullføre overføringen.'}</p>
-              
-              <button 
+
+              <button
                 onClick={reset}
                 className="px-10 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-bold transition-all"
               >
@@ -292,14 +291,13 @@ const UploadCard = () => {
       </motion.div>
 
       {status === 'IDLE' && (
-        <button 
+        <button
           onClick={startTransfer}
           disabled={!file}
-          className={`px-12 py-5 font-black text-xl rounded-2xl transition-all active:scale-95 flex items-center gap-3 ${
-            file 
-            ? 'bg-brand text-black hover:bg-[#e1ec7a] shadow-[0_20px_50px_-12px_rgba(244,254,139,0.3)]' 
-            : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
-          }`}
+          className={`px-12 py-5 font-black text-xl rounded-2xl transition-all active:scale-95 flex items-center gap-3 ${file
+              ? 'bg-brand text-black hover:bg-[#e1ec7a] shadow-[0_20px_50px_-12px_rgba(244,254,139,0.3)]'
+              : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
+            }`}
         >
           {transferMode === 'EMAIL' ? <Send size={24} /> : <LinkIcon size={24} />}
           {transferMode === 'EMAIL' ? 'Overfør via e-post' : 'Hent lenke'}
