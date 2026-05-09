@@ -296,8 +296,8 @@ const UploadCard = () => {
           onClick={startTransfer}
           disabled={!file}
           className={`px-12 py-5 font-black text-xl rounded-2xl transition-all active:scale-95 flex items-center gap-3 ${file
-              ? 'bg-brand text-black hover:bg-[#e1ec7a] shadow-[0_20px_50px_-12px_rgba(244,254,139,0.3)]'
-              : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
+            ? 'bg-brand text-black hover:bg-[#e1ec7a] shadow-[0_20px_50px_-12px_rgba(244,254,139,0.3)]'
+            : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
             }`}
         >
           {transferMode === 'EMAIL' ? <Send size={24} /> : <LinkIcon size={24} />}
