@@ -199,6 +199,7 @@ const UploadCard = () => {
                       <option value={1} className="bg-[#030712]">Utløper om 1 dag</option>
                       <option value={3} className="bg-[#030712]">Utløper om 3 dager</option>
                       <option value={7} className="bg-[#030712]">Utløper om 7 dager</option>
+                      <option value={14} className="bg-[#030712]">Utløper om 14 dager</option>
                     </select>
                   </div>
                 </div>
