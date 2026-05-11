@@ -1,0 +1,41 @@
+name: Build Mac DMG
+
+# This allows you to trigger the build manually with a button
+on:
+  workflow_dispatch:
+
+# Give GitHub permission to create a release and upload the .dmg
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      # This official Tauri action compiles the app and uploads it
+      - name: Build the Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Automatically generates a unique tag for every build
+          tagName: mac-build-${{ github.run_number }}
+          releaseName: 'Drop Involve Mac DMG'
+          releaseBody: 'Download the .dmg file below to install on macOS.'
+          releaseDraft: false
+          prerelease: false
