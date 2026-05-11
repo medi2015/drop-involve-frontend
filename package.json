@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.4",
