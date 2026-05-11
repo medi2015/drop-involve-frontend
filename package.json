@@ -12,8 +12,10 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.4",
+    "@tauri-apps/api": "^2.11.0",
     "autoprefixer": "^10.5.0",
     "framer-motion": "^12.38.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^1.14.0",
     "postcss": "^8.5.14",
     "react": "^19.2.5",
@@ -23,6 +25,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.36.3",
     "@eslint/js": "^10.0.1",
+    "@tauri-apps/cli": "^2.11.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
