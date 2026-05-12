@@ -3,10 +3,12 @@
 use tauri::{Manager, PhysicalPosition};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri_plugin_autostart::MacosLauncher;
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--silent"])))
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             let _ = app.get_webview_window("main").map(|w| {
                 let _ = w.show();
@@ -15,6 +17,17 @@ fn main() {
             });
         }))
         .setup(|app| {
+            // 1. Check if we should start hidden
+            let args: Vec<String> = std::env::args().collect();
+            let is_silent = args.contains(&"--silent".to_string());
+
+            if !is_silent {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                }
+            }
+
+            // 2. Setup Tray and Menu
             let quit_i = MenuItem::with_id(app, "quit", "Avslutt", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Åpne Drop Involve", true, None::<&str>)?;
             let hist_i = MenuItem::with_id(app, "history", "Vis historikk", true, None::<&str>)?;
@@ -61,7 +74,6 @@ fn main() {
                                     } else {
                                         position.y as i32 - size.height as i32 - 10 
                                     };
-                                    
                                     let _ = tray_window.set_position(tauri::Position::Physical(PhysicalPosition { x, y }));
                                 }
                                 let _ = tray_window.show();
@@ -76,9 +88,7 @@ fn main() {
 
             Ok(())
         })
-        // --- NEW CLICK-AWAY LOGIC BELOW ---
         .on_window_event(|window, event| match event {
-            // This detects when the window loses focus
             tauri::WindowEvent::Focused(focused) => {
                 if !focused && window.label() == "tray" {
                     let _ = window.hide();

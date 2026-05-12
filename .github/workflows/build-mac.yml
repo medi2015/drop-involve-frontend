@@ -22,7 +22,6 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          # We need both targets for a Universal build
           targets: aarch64-apple-darwin, x86_64-apple-darwin
 
       - name: Install frontend dependencies
@@ -32,10 +31,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # THESE TWO LINES ENABLE THE UPDATER SIGNING
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: mac-build-${{ github.run_number }}
-          releaseName: 'Drop Involve Mac DMG'
-          # This flag tells Tauri to bundle both architectures together
+          tagName: v__VERSION__ # This will use the version from tauri.conf.json
+          releaseName: 'Drop Involve v__VERSION__'
           args: --target universal-apple-darwin
           releaseDraft: false
           prerelease: false

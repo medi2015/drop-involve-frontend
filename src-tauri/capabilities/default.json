@@ -8,6 +8,10 @@
   "permissions": [
     "core:default",
     "shell:allow-open",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
+    "autostart:allow-set-enabled",
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-hide",

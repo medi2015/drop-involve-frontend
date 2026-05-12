@@ -11,6 +11,7 @@ import {
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'; // Best for v2
 import UploadCard from './components/UploadCard';
+import { enable, isEnabled } from '@tauri-apps/plugin-autostart';
 
 // --- TRAY COMPONENT ---
 const TrayHistory = () => {
@@ -26,6 +27,16 @@ const TrayHistory = () => {
     loadHistory();
     window.addEventListener('storage', loadHistory);
     return () => window.removeEventListener('storage', loadHistory);
+  }, []);
+
+  useEffect(() => {
+    const checkAutostart = async () => {
+      const active = await isEnabled();
+      if (!active) {
+        await enable(); // This turns it on for the user's computer
+      }
+    };
+    checkAutostart();
   }, []);
 
   const handleOpenMain = async () => {
