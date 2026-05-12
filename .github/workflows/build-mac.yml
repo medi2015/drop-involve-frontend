@@ -1,10 +1,8 @@
 name: Build Mac DMG
 
-# This allows you to trigger the build manually with a button
 on:
   workflow_dispatch:
 
-# Give GitHub permission to create a release and upload the .dmg
 permissions:
   contents: write
 
@@ -23,19 +21,21 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # We need both targets for a Universal build
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
 
       - name: Install frontend dependencies
         run: npm install
 
-      # This official Tauri action compiles the app and uploads it
       - name: Build the Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # Automatically generates a unique tag for every build
           tagName: mac-build-${{ github.run_number }}
           releaseName: 'Drop Involve Mac DMG'
-          releaseBody: 'Download the .dmg file below to install on macOS.'
+          # This flag tells Tauri to bundle both architectures together
+          args: --target universal-apple-darwin
           releaseDraft: false
           prerelease: false
