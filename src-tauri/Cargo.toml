@@ -25,8 +25,7 @@ tauri-plugin-autostart = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
-tauri = { version = "2.11.1", features = ["tray-icon"] } # Let defaults handle the features
 tauri-plugin-single-instance = "2.0.0"
-tauri-plugin-log = "2"
 tauri = { version = "2.0", features = ["devtools", "protocol-asset", "tray-icon", "menu"] }
-tauri-plugin-shell = "2.0.0" # <--- ADD THIS LINE
+tauri-plugin-log = "2"
+tauri-plugin-shell = "2.0.0"
