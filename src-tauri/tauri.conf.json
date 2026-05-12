@@ -37,25 +37,7 @@
   },
   "plugins": {
     "shell": {
-      "sidecar": false,
-      "scope": {
-        "allow": [
-          {
-            "program": "powershell",
-            "args": [
-              "-Command",
-              "start",
-              "$URL"
-            ]
-          },
-          {
-            "program": "open",
-            "args": [
-              "$URL"
-            ]
-          }
-        ]
-      }
+      "open": true
     },
     "updater": {
       "active": true,
