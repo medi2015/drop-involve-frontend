@@ -10,10 +10,11 @@
     "core:default",
     "shell:allow-open",
     "updater:allow-check",
+    "updater:allow-download-and-install",
     "dialog:allow-message",
     "dialog:allow-ask",
     "dialog:allow-confirm",
-    "process:allow-relaunch",
+    "process:allow-restart",
     "autostart:allow-enable",
     "autostart:allow-is-enabled"
   ]
