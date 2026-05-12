@@ -8,6 +8,7 @@
   "permissions": [
     "core:default",
     "shell:allow-open",
+    "updater:allow-check",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
