@@ -20,7 +20,7 @@
         "fullscreen": false
       },
       {
-        "label": "tray",
+        "label": "label",
         "title": "Historikk",
         "width": 350,
         "height": 450,
@@ -36,6 +36,27 @@
     }
   },
   "plugins": {
+    "shell": {
+      "sidecar": false,
+      "scope": {
+        "allow": [
+          {
+            "program": "powershell",
+            "args": [
+              "-Command",
+              "start",
+              "$URL"
+            ]
+          },
+          {
+            "program": "open",
+            "args": [
+              "$URL"
+            ]
+          }
+        ]
+      }
+    },
     "updater": {
       "active": true,
       "endpoints": [
@@ -43,7 +64,7 @@
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIyNTc0OEFCNDg2MzA2MDcKUldRSEJtTklxMGhYc3BBNTFScTkzRmZSWmQ2T2wvZEhOVWtXQUdNd3BXSERQZDg5eGRmYjhPWGUK"
     }
-  }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
@@ -54,8 +75,25 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "android": {
-      "debugApplicationIdSuffix": ".debug"
+    "externalBin": [],
+    "copyright": "Copyright © 2026 Involve",
+    "category": "Utility",
+    "shortDescription": "Sikre filoverføringer",
+    "longDescription": "Sikre, raske og pålitelige filoverføringer for Involve.",
+    "deb": {
+      "depends": []
+    },
+    "macos": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "entitlements": null
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
     }
   }
 }
