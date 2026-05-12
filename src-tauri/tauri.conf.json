@@ -20,7 +20,7 @@
         "fullscreen": false
       },
       {
-        "label": "label",
+        "label": "tray",
         "title": "Historikk",
         "width": 350,
         "height": 450,
@@ -74,26 +74,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "externalBin": [],
-    "copyright": "Copyright © 2026 Involve",
-    "category": "Utility",
-    "shortDescription": "Sikre filoverføringer",
-    "longDescription": "Sikre, raske og pålitelige filoverføringer for Involve.",
-    "deb": {
-      "depends": []
-    },
-    "macos": {
-      "frameworks": [],
-      "minimumSystemVersion": "10.13",
-      "exceptionDomain": "",
-      "signingIdentity": null,
-      "entitlements": null
-    },
-    "windows": {
-      "certificateThumbprint": null,
-      "digestAlgorithm": "sha256",
-      "timestampUrl": ""
-    }
+    ]
   }
 }
