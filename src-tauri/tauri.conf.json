@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Drop Involve",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "identifier": "no.involve.drop",
   "build": {
     "frontendDist": "../dist",
@@ -49,6 +49,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true, // <--- ADD THIS LINE
     "targets": "all",
     "icon": [
       "icons/32x32.png",
