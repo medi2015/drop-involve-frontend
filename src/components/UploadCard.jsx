@@ -31,7 +31,11 @@ const UploadCard = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState(() => {
     const saved = localStorage.getItem('dropInvolveHistory');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return parsed.slice(0, 50); // Only load the first 50
+    }
+    return [];
   });
   const [copiedId, setCopiedId] = useState(null);
 
