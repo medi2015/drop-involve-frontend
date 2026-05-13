@@ -22,13 +22,18 @@ jobs:
           - platform: 'windows-latest'
             args: ''
 
-    steps: # Fixed: This must be indented 4 spaces to be "inside" the build job
+    steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node_version: '20'
+
+      # --- ADD THIS STEP TO INSTALL MAC TARGETS ---
+      - name: install rust targets (Mac only)
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
       - name: Install dependencies
         run: npm install 
