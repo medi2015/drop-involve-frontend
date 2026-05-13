@@ -2,16 +2,17 @@ name: Build Release
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
   build:
-    # 1. TELL GITHUB TO USE THE MATRIX PLATFORM
     runs-on: ${{ matrix.platform }}
     
-    # 2. DEFINE THE MATRIX (Mac and Windows)
     strategy:
       fail-fast: false
       matrix:
@@ -19,17 +20,16 @@ jobs:
           - platform: 'macos-latest'
             args: '--target universal-apple-darwin'
           - platform: 'windows-latest'
-            args: '' # Windows builds fine without extra target args
+            args: ''
 
-steps:
+    steps: # Fixed: This must be indented 4 spaces to be "inside" the build job
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node_version: '20' # Or your preferred version
+          node_version: '20'
 
-      # --- ADD THIS STEP ---
       - name: Install dependencies
         run: npm install 
 
