@@ -1,0 +1,41 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # 1. TELL GITHUB TO USE THE MATRIX PLATFORM
+    runs-on: ${{ matrix.platform }}
+    
+    # 2. DEFINE THE MATRIX (Mac and Windows)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
+          - platform: 'windows-latest'
+            args: '' # Windows builds fine without extra target args
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      # ... (keep your existing Node and Rust setup steps here) ...
+
+      - name: Build the Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'Drop Involve v__VERSION__'
+          # 3. USE THE ARGS FROM THE MATRIX
+          args: ${{ matrix.args }}
+          releaseDraft: false
+          prerelease: false
