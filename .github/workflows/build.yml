@@ -21,10 +21,17 @@ jobs:
           - platform: 'windows-latest'
             args: '' # Windows builds fine without extra target args
 
-    steps:
+steps:
       - uses: actions/checkout@v4
-      
-      # ... (keep your existing Node and Rust setup steps here) ...
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node_version: '20' # Or your preferred version
+
+      # --- ADD THIS STEP ---
+      - name: Install dependencies
+        run: npm install 
 
       - name: Build the Tauri App
         uses: tauri-apps/tauri-action@v0
@@ -35,7 +42,6 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Drop Involve v__VERSION__'
-          # 3. USE THE ARGS FROM THE MATRIX
           args: ${{ matrix.args }}
           releaseDraft: false
           prerelease: false
