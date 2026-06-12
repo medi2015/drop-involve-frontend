@@ -23,7 +23,12 @@ const TrayHistory = () => {
 
   const loadHistory = () => {
     const saved = localStorage.getItem('dropInvolveHistory');
-    if (saved) setHistory(JSON.parse(saved));
+    if (saved) {
+      const parsedHistory = JSON.parse(saved);
+      // Limit to the 100 most recent items to maintain performance
+      const cappedHistory = parsedHistory.slice(0, 100); 
+      setHistory(cappedHistory);
+    }
   };
 
   useEffect(() => {
