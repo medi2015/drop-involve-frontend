@@ -192,7 +192,7 @@ const UploadCard = () => {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       // ... the rest of your code stays exactly the same
       // FIXED: Changed "response" to "res", added "{", and used "fileToUpload"
-      const res = await fetch('http://80.240.25.105:5000/generate-upload-url', {
+      const res = await fetch('https://file.involve.no/generate-upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
