@@ -8,7 +8,7 @@ import {
   Clock, Send, User, Key, History as HistoryIcon // <--- Added Key here
 } from 'lucide-react';
 
-const API_BASE = 'https://drop-involve-backend.onrender.com';
+const API_BASE = '80.240.25.105:5000';
 
 const UploadCard = () => {
   const [file, setFile] = useState(null);
