@@ -9,10 +9,15 @@ import {
 } from 'lucide-react';
 import { readList, writeJson, STORAGE_KEYS } from '../lib/storage';
 
-// Production backend. This is what the live site at drop.involve.no actually
-// calls — verified against the deployed build, not assumed.
-// Override with VITE_API_URL at build time to point at a different backend.
-const API_BASE = import.meta.env.VITE_API_URL || 'https://drop-involve-backend.onrender.com';
+// Production backend, served from the Vultr VPS behind nginx.
+//
+// Previously this pointed at Render's free tier, which sleeps after 15 minutes
+// idle and takes 30-60s to wake — that cold start was the long wait before a
+// verification code arrived. The VPS runs continuously and costs nothing extra.
+//
+// Render still runs the same code as a fallback for desktop builds older than
+// 0.1.19, which have the old URL compiled in.
+const API_BASE = import.meta.env.VITE_API_URL || 'https://file.involve.no';
 
 const UploadCard = () => {
   const [file, setFile] = useState(null);

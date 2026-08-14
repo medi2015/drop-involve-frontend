@@ -55,7 +55,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Baked into the bundle at build time. Without this the app falls back
           # to the default in UploadCard.jsx.
-          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://drop-involve-backend.onrender.com' }}
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://file.involve.no' }}
         with:
           tagName: v__VERSION__
           releaseName: 'Drop Involve v__VERSION__'
