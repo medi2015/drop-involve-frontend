@@ -1,6 +1,6 @@
 
 import JSZip from 'jszip'; // <--- ADD THIS
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileCheck, Copy, Loader2, Link as LinkIcon,
@@ -31,6 +31,9 @@ const UploadCard = () => {
   const [message, setMessage] = useState('');
   const [expiry, setExpiry] = useState(7);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  // A ref rather than state: the token is issued and used inside one async
+  // function, so it must be readable immediately, and nothing renders from it.
+  const sessionTokenRef = useRef(null);
   // --- HISTORY STATE ---
   const [showHistory, setShowHistory] = useState(false);
   // Only load the 50 most recent. readList never throws, so corrupt storage
@@ -41,6 +44,9 @@ const UploadCard = () => {
   useEffect(() => {
     setSavedContacts(readList(STORAGE_KEYS.contacts));
   }, []);
+
+  const authHeaders = () =>
+    sessionTokenRef.current ? { Authorization: `Bearer ${sessionTokenRef.current}` } : {};
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -120,8 +126,10 @@ const UploadCard = () => {
   const uploadFile = async (fileToUpload) => {
     setError('');
 
-    // --- NEW SECURITY INTERCEPT ---
-    if (transferMode === 'EMAIL') { // <--- OPENS HERE
+    // --- SECURITY INTERCEPT ---
+    // Applies to both modes. A share link puts a file in our bucket and hands
+    // out a public URL, so it needs the same proof of identity as an email.
+    {
 
       if (!emailFrom.toLowerCase().endsWith('@involve.no')) {
         setError('Kun @involve.no-adresser kan sende filer.');
@@ -171,8 +179,14 @@ const UploadCard = () => {
           });
 
           if (!verifyRes.ok) {
-            throw new Error('Feil kode. Prøv igjen.');
+            const body = await verifyRes.json().catch(() => ({}));
+            throw new Error(body.error || 'Feil kode. Prøv igjen.');
           }
+
+          // Proof of verification for the rest of the transfer. Held in state
+          // only — deliberately not persisted, so closing the app ends it.
+          const { token } = await verifyRes.json();
+          if (token) sessionTokenRef.current = token;
         } catch (err) {
           setError(err.message);
           setStatus('ERROR');
@@ -189,7 +203,7 @@ const UploadCard = () => {
     try {
       const res = await fetch(`${API_BASE}/generate-upload-url`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           // ADD THIS FALLBACK: || 'application/octet-stream'
           contentType: fileToUpload.type || 'application/octet-stream',
@@ -215,7 +229,10 @@ const UploadCard = () => {
       if (!uploadRes.ok) throw new Error('Upload failed');
 
       const expiresInSeconds = expiry * 24 * 60 * 60;
-      const downloadRes = await fetch(`${API_BASE}/generate-download-url?objectKey=${objectKey}&expiresIn=${expiresInSeconds}`);
+      const downloadRes = await fetch(
+        `${API_BASE}/generate-download-url?objectKey=${objectKey}&expiresIn=${expiresInSeconds}`,
+        { headers: authHeaders() }
+      );
       if (!downloadRes.ok) throw new Error('Failed to generate link');
       const { downloadUrl } = await downloadRes.json();
 
@@ -243,7 +260,7 @@ const UploadCard = () => {
         try {
           await fetch(`${API_BASE}/send-email`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
             body: JSON.stringify({
               emailTo,
               emailFrom,
@@ -286,6 +303,7 @@ const UploadCard = () => {
     setMessage('');
     setIsOtpSent(false); // <--- ADD THIS
     setOtp('');          // <--- ADD THIS
+    sessionTokenRef.current = null;
   };
 
   return (
@@ -460,51 +478,57 @@ const UploadCard = () => {
                           </div>
                         )}
                       </div>
-                      {/* Send From Field */}
-                      <div className="relative">
-                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sand/70" size={18} />
-                        <input
-                          type="email"
-                          placeholder="Din e-post (Send fra)"
-                          value={emailFrom}
-                          onChange={(e) => setEmailFrom(e.target.value)}
-                          disabled={isOtpSent} // Locks the email field once the code is sent
-                          className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none disabled:opacity-50"
-                        />
-                      </div>
-
-                      {/* NEW OTP FIELD PLACED RIGHT HERE */}
-                      {isOtpSent && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="relative mt-2"
-                        >
-                          <Key className="absolute left-3.5 top-[calc(50%-10px)] -translate-y-1/2 text-brand" size={18} />
-                          <input
-                            type="text"
-                            placeholder="Skriv inn 6-sifret kode fra e-post"
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value)}
-                            maxLength={6}
-                            className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none"
-                          />
-                          <p className="text-xs text-brand/70 mt-2 ml-1">Sjekk innboksen til {emailFrom} for koden.</p>
-                        </motion.div>
-                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
+                {/* Sender identity and verification. Outside the EMAIL block on
+                    purpose: a share link uploads a file and publishes a URL, so
+                    it needs the same proof of identity an email does. */}
                 <div className="relative">
-                  <MessageSquare className="absolute left-3.5 top-3.5 text-sand/70" size={18} />
-                  <textarea
-                    placeholder="Din melding"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    className="w-full bg-sand/5 border border-sand/10 rounded-xl py-4 pl-12 pr-4 text-sand min-h-[100px] resize-none focus:outline-none focus:border-brand/50 transition-all"
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sand/70" size={18} />
+                  <input
+                    type="email"
+                    placeholder="Din e-post (@involve.no)"
+                    value={emailFrom}
+                    onChange={(e) => setEmailFrom(e.target.value)}
+                    disabled={isOtpSent} // Locks the email field once the code is sent
+                    className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none disabled:opacity-50"
                   />
                 </div>
+
+                {isOtpSent && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="relative"
+                  >
+                    <Key className="absolute left-3.5 top-[calc(50%-10px)] -translate-y-1/2 text-brand" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Skriv inn 6-sifret kode fra e-post"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      maxLength={6}
+                      className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none"
+                    />
+                    <p className="text-xs text-brand/70 mt-2 ml-1">Sjekk innboksen til {emailFrom} for koden.</p>
+                  </motion.div>
+                )}
+
+                {/* The message only travels with an email, so it's hidden when
+                    the user just wants a link. */}
+                {transferMode === 'EMAIL' && (
+                  <div className="relative">
+                    <MessageSquare className="absolute left-3.5 top-3.5 text-sand/70" size={18} />
+                    <textarea
+                      placeholder="Din melding"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand min-h-[100px] resize-none focus:outline-none"
+                    />
+                  </div>
+                )}
 
                 {/* NEW RECEIPT OPT-IN CHECKBOX */}
                 {transferMode === 'EMAIL' && (
@@ -542,8 +566,12 @@ const UploadCard = () => {
                     : 'bg-sand/5 text-sand/40 cursor-not-allowed'
                     }`}
                 >
-                  {transferMode === 'EMAIL' ? <Send size={18} /> : <LinkIcon size={18} />}
-                  {transferMode === 'EMAIL' ? 'Overfør via e-post' : 'Hent lenke'}
+                  {!isOtpSent
+                    ? <Key size={18} />
+                    : (transferMode === 'EMAIL' ? <Send size={18} /> : <LinkIcon size={18} />)}
+                  {!isOtpSent
+                    ? 'Send kode til e-posten din'
+                    : (transferMode === 'EMAIL' ? 'Bekreft og send e-post' : 'Bekreft og hent lenke')}
                 </button>
               </div>
             </motion.div>
