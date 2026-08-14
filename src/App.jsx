@@ -11,6 +11,7 @@ import {
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import UploadCard from './components/UploadCard';
+import { readList, STORAGE_KEYS } from './lib/storage';
 import { enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { check } from '@tauri-apps/plugin-updater';
 import { ask } from '@tauri-apps/plugin-dialog';
@@ -22,13 +23,8 @@ const TrayHistory = () => {
   const [copiedId, setCopiedId] = useState(null);
 
   const loadHistory = () => {
-    const saved = localStorage.getItem('dropInvolveHistory');
-    if (saved) {
-      const parsedHistory = JSON.parse(saved);
-      // Limit to the 100 most recent items to maintain performance
-      const cappedHistory = parsedHistory.slice(0, 100); 
-      setHistory(cappedHistory);
-    }
+    // Limit to the 100 most recent items to maintain performance.
+    setHistory(readList(STORAGE_KEYS.history, 100));
   };
 
   useEffect(() => {

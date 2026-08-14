@@ -7,8 +7,12 @@ import {
   AlertCircle, X, Plus, Mail, MessageSquare, CheckCircle2,
   Clock, Send, User, Key, History as HistoryIcon // <--- Added Key here
 } from 'lucide-react';
+import { readList, writeJson, STORAGE_KEYS } from '../lib/storage';
 
-const API_BASE = '80.240.25.105:5000';
+// Production backend. This is what the live site at drop.involve.no actually
+// calls — verified against the deployed build, not assumed.
+// Override with VITE_API_URL at build time to point at a different backend.
+const API_BASE = import.meta.env.VITE_API_URL || 'https://drop-involve-backend.onrender.com';
 
 const UploadCard = () => {
   const [file, setFile] = useState(null);
@@ -29,19 +33,13 @@ const UploadCard = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   // --- HISTORY STATE ---
   const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState(() => {
-    const saved = localStorage.getItem('dropInvolveHistory');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.slice(0, 50); // Only load the first 50
-    }
-    return [];
-  });
+  // Only load the 50 most recent. readList never throws, so corrupt storage
+  // costs the user their history rather than the entire app.
+  const [history, setHistory] = useState(() => readList(STORAGE_KEYS.history, 50));
   const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
-    const storedContacts = JSON.parse(localStorage.getItem('dropInvolveContacts') || '[]');
-    setSavedContacts(storedContacts);
+    setSavedContacts(readList(STORAGE_KEYS.contacts));
   }, []);
 
   const handleDragOver = (e) => {
@@ -189,10 +187,7 @@ const UploadCard = () => {
 
     setStatus('UPLOADING');
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      // ... the rest of your code stays exactly the same
-      // FIXED: Changed "response" to "res", added "{", and used "fileToUpload"
-      const res = await fetch('https://file.involve.no/generate-upload-url', {
+      const res = await fetch(`${API_BASE}/generate-upload-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -240,7 +235,7 @@ const UploadCard = () => {
       // Add to the top of the list, keep only the 50 most recent
       const updatedHistory = [newTransfer, ...history].slice(0, 50);
       setHistory(updatedHistory);
-      localStorage.setItem('dropInvolveHistory', JSON.stringify(updatedHistory));
+      writeJson(STORAGE_KEYS.history, updatedHistory);
       // -------------------------
 
       // --- NEW EMAIL LOGIC ---
@@ -263,7 +258,7 @@ const UploadCard = () => {
           const updatedContacts = [...new Set([...newEmails, ...savedContacts])].slice(0, 10); // Keeps the 10 most recent
 
           setSavedContacts(updatedContacts);
-          localStorage.setItem('dropInvolveContacts', JSON.stringify(updatedContacts));
+          writeJson(STORAGE_KEYS.contacts, updatedContacts);
         } catch (emailErr) {
           console.error("Email failed to send, but file was uploaded:", emailErr);
           // We don't setStatus('ERROR') here because the file upload actually worked.

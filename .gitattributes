@@ -1,0 +1,19 @@
+# Normalise line endings so Windows checkouts stop rewriting every file.
+# Without this, saving a file on Windows converts LF to CRLF and git reports
+# the entire file as modified even when no content changed.
+* text=auto eol=lf
+
+# Binary assets must never be touched.
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.dmg binary
+*.exe binary
+*.msi binary
+*.key binary

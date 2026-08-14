@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.platform }}
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -25,18 +25,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # NOTE: the input is "node-version", not "node_version". The old spelling
+      # was silently ignored, so builds ran on whatever Node the runner shipped.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node_version: '20'
+          node-version: '22'
 
-      # --- ADD THIS STEP TO INSTALL MAC TARGETS ---
-      - name: install rust targets (Mac only)
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust targets (macOS only)
         if: matrix.platform == 'macos-latest'
         run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
       - name: Install dependencies
-        run: npm install 
+        run: npm install
 
       - name: Build the Tauri App
         uses: tauri-apps/tauri-action@v0
@@ -44,6 +53,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Baked into the bundle at build time. Without this the app falls back
+          # to the default in UploadCard.jsx.
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://drop-involve-backend.onrender.com' }}
         with:
           tagName: v__VERSION__
           releaseName: 'Drop Involve v__VERSION__'
