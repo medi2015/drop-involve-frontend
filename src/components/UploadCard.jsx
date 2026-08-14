@@ -530,7 +530,6 @@ const UploadCard = () => {
                       <option value={1} className="bg-ink">Utløper om 1 dag</option>
                       <option value={3} className="bg-ink">Utløper om 3 dager</option>
                       <option value={7} className="bg-ink">Utløper om 7 dager</option>
-                      <option value={14} className="bg-ink">Utløper om 14 dager</option>
                     </select>
                   </div>
                 </div>
