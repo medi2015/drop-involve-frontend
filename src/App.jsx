@@ -158,21 +158,26 @@ const App = () => {
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 md:p-10 overflow-hidden bg-[#030712] text-white">
-      <div className="fixed inset-0 grid-pattern opacity-100 pointer-events-none" />
-      <div className="orb w-[400px] h-[400px] bg-[#c4d600] bottom-[-50px] right-[-50px] animate-float opacity-5" />
-
-      <main className="relative z-10 w-full flex flex-col items-center">
+    <div className="min-h-screen flex flex-col items-center px-4 py-8 md:px-10 md:py-12 bg-ink text-sand">
+      <main className="w-full max-w-3xl flex-1 flex flex-col">
         <motion.header
-          initial={{ opacity: 0, y: -30 }}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12 flex flex-col items-center"
+          className="flex flex-col items-center text-center mb-10"
         >
-          <h1 className="text-4xl font-bold uppercase tracking-wider text-white mb-2">
-            <span style={{ color: '#F4FE8B' }}>DROP</span>.INVOLVE.NO
-          </h1>
-          <p className="text-slate-400 font-medium text-lg">
-            Sikre, raske og pålitelige filoverføringer
+          <div className="flex items-center gap-3">
+            <span
+              aria-hidden="true"
+              className="w-9 h-9 rounded-md bg-brand text-ink-deep flex items-center justify-center text-xl font-bold leading-none"
+            >
+              I
+            </span>
+            <h1 className="text-xl font-bold tracking-wide text-sand leading-none">
+              drop.involve.no
+            </h1>
+          </div>
+          <p className="text-sm text-sand/60 mt-3">
+            Sikre og raske filoverføringer
           </p>
         </motion.header>
 
@@ -181,18 +186,20 @@ const App = () => {
         <motion.footer
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-12 flex flex-col items-center gap-2 text-slate-500 text-sm font-medium"
+          transition={{ delay: 0.4 }}
+          className="mt-10 pt-6 border-t border-sand/10 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-sand/50"
         >
-          <p className="text-slate-600 mb-2">Files are encrypted with AES-256</p>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 hover:text-[#c4d600] transition-colors cursor-pointer">
-              <Globe size={16} />
-              <span>drop.involve.no</span>
-            </div>
-            <div className="w-1 h-1 bg-slate-700 rounded-full" />
-            <span>Terms & Privacy</span>
-          </div>
+          <span>Filene lagres kryptert og slettes automatisk</span>
+          <a
+            href="https://involve.no"
+            className="flex items-center gap-2 hover:text-brand transition-colors ml-auto"
+          >
+            <Globe size={15} />
+            <span>involve.no</span>
+          </a>
+          <span className="hover:text-brand transition-colors cursor-pointer">
+            Vilkår og personvern
+          </span>
         </motion.footer>
       </main>
     </div>

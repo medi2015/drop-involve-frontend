@@ -289,34 +289,33 @@ const UploadCard = () => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-8 w-full max-w-4xl px-4">
+    <div className="flex flex-col items-center gap-6 w-full">
       {/* Transfer Mode Toggle & History Button */}
       {status === 'IDLE' && (
         <div className="flex flex-wrap justify-center items-center gap-4 mb-2">
 
           {/* Email / Link Toggle */}
-          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10">
+          <div className="flex bg-sand/5 p-1 rounded-lg">
             <button
               onClick={() => setTransferMode('EMAIL')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${transferMode === 'EMAIL' ? 'bg-brand text-black' : 'text-slate-400 hover:text-white'}`}
+              className={`px-5 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${transferMode === 'EMAIL' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
             >
-              <Send size={16} /> Send e-post
+              <Send size={15} /> Send e-post
             </button>
             <button
               onClick={() => setTransferMode('LINK')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${transferMode === 'LINK' ? 'bg-brand text-black' : 'text-slate-400 hover:text-white'}`}
+              className={`px-5 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${transferMode === 'LINK' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
             >
-              <LinkIcon size={16} /> Hent lenke
+              <LinkIcon size={15} /> Hent lenke
             </button>
           </div>
 
-          {/* NEW: Prominent History Button */}
           {!showHistory && history.length > 0 && (
             <button
               onClick={() => setShowHistory(true)}
-              className="flex items-center gap-2 px-6 py-2 bg-white/5 border border-white/10 rounded-2xl text-slate-300 hover:text-white hover:bg-white/10 transition-all text-sm font-bold shadow-lg"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors text-sm font-medium"
             >
-              <HistoryIcon size={16} className="text-brand" /> Vis historikk
+              <HistoryIcon size={15} /> Vis historikk
             </button>
           )}
 
@@ -325,7 +324,7 @@ const UploadCard = () => {
 
       <motion.div
         layout
-        className={`w-full bg-[#030712] border-2 rounded-[2rem] p-8 md:p-12 flex flex-col items-center justify-center transition-all duration-300 relative overflow-hidden min-h-[450px] ${isDragging ? 'border-brand shadow-[0_0_50px_-12px_rgba(244,254,139,0.3)]' : 'border-white/10'
+        className={`w-full surface rounded-2xl p-6 md:p-8 flex flex-col items-center justify-center transition-colors duration-200 relative overflow-hidden min-h-[380px] ${isDragging ? 'border-brand' : ''
           }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -336,12 +335,12 @@ const UploadCard = () => {
         {showHistory && (
           <div className="w-full h-full flex flex-col min-h-[400px] z-10 w-full">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <h2 className="text-xl font-bold text-sand flex items-center gap-2">
                 <HistoryIcon className="text-brand" /> Tidligere overføringer
               </h2>
               <button
                 onClick={() => setShowHistory(false)}
-                className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-full transition-colors"
+                className="text-sand/60 hover:text-sand bg-sand/5 p-2 rounded-full transition-colors"
               >
                 <X size={20} />
               </button>
@@ -349,15 +348,15 @@ const UploadCard = () => {
 
             <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
               {history.map((item) => (
-                <div key={item.id} className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center justify-between group hover:bg-white/10 transition-colors w-full">
+                <div key={item.id} className="bg-sand/5 border border-sand/10 p-4 rounded-xl flex items-center justify-between group hover:bg-sand/10 transition-colors w-full">
                   <div className="overflow-hidden pr-4 max-w-[60%]">
-                    <p className="text-white font-medium truncate text-sm">{item.fileName}</p>
-                    <p className="text-slate-500 text-xs mt-1">{item.date}</p>
+                    <p className="text-sand font-medium truncate text-sm">{item.fileName}</p>
+                    <p className="text-sand/50 text-xs mt-1">{item.date}</p>
                   </div>
 
                   <button
                     onClick={() => handleCopyLink(item.url, item.id)}
-                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-[#c4d600]/10 text-[#c4d600] rounded-lg hover:bg-[#c4d600] hover:text-black transition-colors font-medium text-sm"
+                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-[#F5FF8C]/10 text-[#F5FF8C] rounded-lg hover:bg-[#F5FF8C] hover:text-ink-deep transition-colors font-medium text-sm"
                   >
                     {copiedId === item.id ? (
                       <><CheckCircle2 size={16} /> Kopiert</>
@@ -379,25 +378,28 @@ const UploadCard = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col md:flex-row items-center gap-12 w-full"
+              className="flex flex-col md:flex-row items-stretch gap-6 w-full"
             >
               {/* Drop Zone */}
               <div className="flex-1 w-full">
-                <label className="cursor-pointer group flex flex-col items-center border-2 border-dashed border-white/5 rounded-[1.5rem] p-10 hover:bg-white/[0.02] transition-all h-full min-h-[280px] justify-center relative overflow-hidden">
-                  <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 transition-all duration-300 overflow-hidden ${file ? 'bg-emerald-500/20 text-emerald-400' : 'bg-brand text-black shadow-[0_0_30px_-10px_rgba(244,254,139,0.5)]'}`}>
+                <label
+                  data-dragging={isDragging}
+                  className="dropzone cursor-pointer flex flex-col items-center rounded-xl p-8 h-full min-h-[240px] justify-center relative overflow-hidden"
+                >
+                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center mb-5 transition-colors overflow-hidden ${file ? 'bg-mint text-ink' : 'bg-brand text-ink-deep'}`}>
                     {file ? (
                       file.type.startsWith('image/') ? (
-                        <img src={URL.createObjectURL(file)} alt="Preview" className="w-full h-full object-cover" />
+                        <img src={URL.createObjectURL(file)} alt="Forhåndsvisning" className="w-full h-full object-cover" />
                       ) : (
-                        <FileCheck size={36} />
+                        <FileCheck size={28} />
                       )
                     ) : (
-                      <Upload size={36} />
+                      <Upload size={28} />
                     )}
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">{file ? 'Fil valgt' : 'Drop dine filer her'}</h3>
-                  <p className="text-slate-500 text-xs text-center max-w-[200px] truncate">
-                    {file ? file.name : 'eller klikk hvor som helst for å bla gjennom'}
+                  <h3 className="text-lg font-medium text-sand mb-1">{file ? 'Fil valgt' : 'Slipp filene her'}</h3>
+                  <p className="text-sand/50 text-xs text-center max-w-[220px] truncate">
+                    {file ? file.name : 'eller klikk for å bla gjennom'}
                   </p>
                   <input type="file" multiple className="hidden" onChange={handleFileSelect} />
                 </label>
@@ -415,7 +417,7 @@ const UploadCard = () => {
                     >
                       {/* Send To Field with Autocomplete Dropdown */}
                       <div className="relative z-50">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sand/70" size={18} />
                         <input
                           type="text"
                           placeholder="Send til (bruk komma for flere)"
@@ -425,12 +427,12 @@ const UploadCard = () => {
                             setIsDropdownOpen(true);
                           }}
                           onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)} // Delay allows click to register
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-brand/50 transition-all"
+                          className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none"
                         />
 
                         {/* NEW DROPDOWN MENU */}
                         {isDropdownOpen && savedContacts.length > 0 && (
-                          <div className="absolute top-full left-0 w-full mt-2 bg-[#111] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+                          <div className="absolute top-full left-0 w-full mt-2 bg-ink-deep border border-sand/10 rounded-xl overflow-hidden">
                             {savedContacts
                               .filter(contact => {
                                 // Only search the word currently being typed (after the last comma)
@@ -450,7 +452,7 @@ const UploadCard = () => {
                                     setEmailTo(newVal);
                                     setIsDropdownOpen(false);
                                   }}
-                                  className="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-brand/20 hover:text-white transition-colors border-b border-white/5 last:border-0"
+                                  className="w-full text-left px-4 py-3 text-sm text-sand/80 hover:bg-brand/20 hover:text-sand transition-colors border-b border-sand/10 last:border-0"
                                 >
                                   {contact}
                                 </button>
@@ -460,14 +462,14 @@ const UploadCard = () => {
                       </div>
                       {/* Send From Field */}
                       <div className="relative">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sand/70" size={18} />
                         <input
                           type="email"
                           placeholder="Din e-post (Send fra)"
                           value={emailFrom}
                           onChange={(e) => setEmailFrom(e.target.value)}
                           disabled={isOtpSent} // Locks the email field once the code is sent
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-brand/50 transition-all disabled:opacity-50"
+                          className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none disabled:opacity-50"
                         />
                       </div>
 
@@ -478,14 +480,14 @@ const UploadCard = () => {
                           animate={{ opacity: 1, height: 'auto' }}
                           className="relative mt-2"
                         >
-                          <Key className="absolute left-4 top-[calc(50%-10px)] -translate-y-1/2 text-brand" size={18} />
+                          <Key className="absolute left-3.5 top-[calc(50%-10px)] -translate-y-1/2 text-brand" size={18} />
                           <input
                             type="text"
                             placeholder="Skriv inn 6-sifret kode fra e-post"
                             value={otp}
                             onChange={(e) => setOtp(e.target.value)}
                             maxLength={6}
-                            className="w-full bg-brand/10 border border-brand/30 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-brand transition-all"
+                            className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none"
                           />
                           <p className="text-xs text-brand/70 mt-2 ml-1">Sjekk innboksen til {emailFrom} for koden.</p>
                         </motion.div>
@@ -495,23 +497,23 @@ const UploadCard = () => {
                 </AnimatePresence>
 
                 <div className="relative">
-                  <MessageSquare className="absolute left-4 top-4 text-slate-500" size={18} />
+                  <MessageSquare className="absolute left-3.5 top-3.5 text-sand/70" size={18} />
                   <textarea
                     placeholder="Din melding"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white min-h-[120px] resize-none focus:outline-none focus:border-brand/50 transition-all"
+                    className="w-full bg-sand/5 border border-sand/10 rounded-xl py-4 pl-12 pr-4 text-sand min-h-[100px] resize-none focus:outline-none focus:border-brand/50 transition-all"
                   />
                 </div>
 
                 {/* NEW RECEIPT OPT-IN CHECKBOX */}
                 {transferMode === 'EMAIL' && (
-                  <label className="flex items-center gap-3 text-sm text-slate-300 cursor-pointer w-fit hover:text-white transition-colors">
+                  <label className="flex items-center gap-3 text-sm text-sand/80 cursor-pointer w-fit hover:text-sand transition-colors">
                     <input
                       type="checkbox"
                       checked={requireReceipt}
                       onChange={(e) => setRequireReceipt(e.target.checked)}
-                      className="w-4 h-4 accent-[#c4d600] cursor-pointer"
+                      className="w-4 h-4 accent-[#F5FF8C] cursor-pointer"
                     />
                     Få varsel på e-post når filen lastes ned
                   </label>
@@ -519,19 +521,31 @@ const UploadCard = () => {
 
                 <div className="flex items-center gap-4">
                   <div className="flex-1 relative">
-                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sand/70" size={18} />
                     <select
                       value={expiry}
                       onChange={(e) => setExpiry(Number(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white appearance-none focus:outline-none focus:border-brand/50 transition-all cursor-pointer"
+                      className="w-full bg-sand/5 border border-sand/10 rounded-xl py-4 pl-12 pr-4 text-sand appearance-none focus:outline-none focus:border-brand/50 transition-all cursor-pointer"
                     >
-                      <option value={1} className="bg-[#030712]">Utløper om 1 dag</option>
-                      <option value={3} className="bg-[#030712]">Utløper om 3 dager</option>
-                      <option value={7} className="bg-[#030712]">Utløper om 7 dager</option>
-                      <option value={14} className="bg-[#030712]">Utløper om 14 dager</option>
+                      <option value={1} className="bg-ink">Utløper om 1 dag</option>
+                      <option value={3} className="bg-ink">Utløper om 3 dager</option>
+                      <option value={7} className="bg-ink">Utløper om 7 dager</option>
+                      <option value={14} className="bg-ink">Utløper om 14 dager</option>
                     </select>
                   </div>
                 </div>
+
+                <button
+                  onClick={startTransfer}
+                  disabled={!file}
+                  className={`w-full mt-2 px-6 py-4 font-medium text-base rounded-xl transition-colors active:scale-[0.99] flex items-center justify-center gap-2 ${file
+                    ? 'bg-brand text-ink-deep hover:bg-brand/90'
+                    : 'bg-sand/5 text-sand/40 cursor-not-allowed'
+                    }`}
+                >
+                  {transferMode === 'EMAIL' ? <Send size={18} /> : <LinkIcon size={18} />}
+                  {transferMode === 'EMAIL' ? 'Overfør via e-post' : 'Hent lenke'}
+                </button>
               </div>
             </motion.div>
           )}
@@ -547,8 +561,8 @@ const UploadCard = () => {
               <div className="w-24 h-24 rounded-2xl bg-brand/10 flex items-center justify-center mb-8">
                 <Loader2 size={40} className="text-brand animate-spin" />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Komprimerer filer...</h3>
-              <p className="text-slate-400 mb-8 text-center">Gjør klar en .zip-fil for overføring</p>
+              <h3 className="text-2xl font-bold text-sand mb-2">Komprimerer filer...</h3>
+              <p className="text-sand/60 mb-8 text-center">Gjør klar en .zip-fil for overføring</p>
             </motion.div>
           )}
 
@@ -563,14 +577,14 @@ const UploadCard = () => {
               <div className="w-24 h-24 rounded-2xl bg-brand/10 flex items-center justify-center mb-8">
                 <Loader2 size={40} className="text-brand animate-spin" />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Overfører...</h3>
-              <p className="text-slate-400 mb-8 truncate w-full text-center">{file?.name}</p>
+              <h3 className="text-2xl font-bold text-sand mb-2">Overfører...</h3>
+              <p className="text-sand/60 mb-8 truncate w-full text-center">{file?.name}</p>
 
-              <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden mb-4">
+              <div className="w-full bg-sand/5 h-2 rounded-full overflow-hidden mb-4">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: "70%" }}
-                  className="h-full bg-brand shadow-[0_0_20px_rgba(244,254,139,0.4)]"
+                  className="h-full bg-brand"
                 />
               </div>
               <p className="text-brand text-sm font-bold uppercase tracking-widest">Behandler</p>
@@ -587,14 +601,14 @@ const UploadCard = () => {
               <div className="w-24 h-24 rounded-full bg-brand/10 flex items-center justify-center mb-8 text-brand">
                 <CheckCircle2 size={48} />
               </div>
-              <h3 className="text-3xl font-bold text-white mb-2 text-center">Fullført!</h3>
-              <p className="text-slate-400 mb-10 text-center">
+              <h3 className="text-3xl font-bold text-sand mb-2 text-center">Fullført!</h3>
+              <p className="text-sand/60 mb-10 text-center">
                 {transferMode === 'EMAIL' ? 'E-post er sendt og filen er klar' : 'Filen din er klar for deling'}
               </p>
 
-              <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-6 mb-8 flex items-center gap-4">
+              <div className="w-full bg-sand/5 border border-sand/10 rounded-2xl p-6 mb-8 flex items-center gap-4">
                 <LinkIcon size={24} className="text-brand shrink-0" />
-                <p className="text-slate-200 text-base truncate flex-1 font-mono">{downloadUrl}</p>
+                <p className="text-sand/90 text-base truncate flex-1 font-mono">{downloadUrl}</p>
                 <button
                   onClick={copyToClipboard}
                   className="p-3 hover:bg-brand/10 rounded-xl text-brand transition-colors"
@@ -605,7 +619,7 @@ const UploadCard = () => {
 
               <button
                 onClick={reset}
-                className="text-slate-400 hover:text-white transition-colors flex items-center gap-2 font-bold"
+                className="text-sand/60 hover:text-sand transition-colors flex items-center gap-2 font-bold"
               >
                 <X size={18} /> Lukk og tilbakestill
               </button>
@@ -622,12 +636,12 @@ const UploadCard = () => {
               <div className="w-20 h-20 rounded-full bg-rose-500/10 flex items-center justify-center mb-6 text-rose-500">
                 <AlertCircle size={40} />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Noe gikk galt</h3>
+              <h3 className="text-2xl font-bold text-sand mb-2">Noe gikk galt</h3>
               <p className="text-rose-400/80 text-center mb-10">{error || 'Kunne ikke fullføre overføringen.'}</p>
 
               <button
                 onClick={reset}
-                className="px-10 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-bold transition-all"
+                className="px-10 py-4 bg-sand/5 hover:bg-sand/10 text-sand rounded-2xl font-bold transition-all"
               >
                 Prøv igjen
               </button>
@@ -636,19 +650,6 @@ const UploadCard = () => {
         </AnimatePresence>
       </motion.div>
 
-      {status === 'IDLE' && (
-        <button
-          onClick={startTransfer}
-          disabled={!file}
-          className={`px-12 py-5 font-black text-xl rounded-2xl transition-all active:scale-95 flex items-center gap-3 ${file
-            ? 'bg-brand text-black hover:bg-[#e1ec7a] shadow-[0_20px_50px_-12px_rgba(244,254,139,0.3)]'
-            : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
-            }`}
-        >
-          {transferMode === 'EMAIL' ? <Send size={24} /> : <LinkIcon size={24} />}
-          {transferMode === 'EMAIL' ? 'Overfør via e-post' : 'Hent lenke'}
-        </button>
-      )}
     </div>
   );
 };
