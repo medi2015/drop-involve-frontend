@@ -29,3 +29,13 @@ dist-ssr
 !.dev.vars.example
 .env*
 !.env.example
+
+# Signing keys — never commit the private key.
+# CI signs releases using the TAURI_SIGNING_PRIVATE_KEY repository secret.
+# The .pub file is safe to track; it must match the pubkey in tauri.conf.json.
+src-tauri/updater.key
+!src-tauri/updater.key.pub
+
+# Scratch files
+keytest.txt
+*.sig
