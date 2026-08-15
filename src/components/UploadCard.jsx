@@ -5,15 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileCheck, Copy, Loader2, Link as LinkIcon,
   AlertCircle, X, Plus, Mail, MessageSquare, CheckCircle2,
-  Clock, Send, User, Key, Lock, History as HistoryIcon // <--- Added Key here
+  Clock, Send, Lock, History as HistoryIcon
 } from 'lucide-react';
 import { readList, writeJson, STORAGE_KEYS } from '../lib/storage';
 import { API_BASE } from '../lib/api';
 
 /**
- * @param {{session?: {token: string, user: {email: string, name?: string}}}} props
- *   Present when signed in with Google (web). Absent on desktop, which still
- *   verifies by email code until it gets its own OAuth flow.
+ * @param {{session: {token: string, user: {email: string, name?: string}}}} props
+ *   Always present — App renders the sign-in screen instead when it isn't.
  */
 const UploadCard = ({ session }) => {
   const [file, setFile] = useState(null);
@@ -24,12 +23,10 @@ const UploadCard = ({ session }) => {
   const [requireReceipt, setRequireReceipt] = useState(false);
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
-  // Known already when signed in; typed by hand only on desktop.
-  const [emailFrom, setEmailFrom] = useState(session?.user?.email || '');
+  // Always known: nothing renders until the user has signed in.
+  const emailFrom = session.user.email;
   const [emailTo, setEmailTo] = useState('');
   const [savedContacts, setSavedContacts] = useState([]); // <--- NEW
-  const [isOtpSent, setIsOtpSent] = useState(false); // <--- NEW
-  const [otp, setOtp] = useState('');                // <--- NEW
   const [message, setMessage] = useState('');
   const [expiry, setExpiry] = useState(7);
   const [linkPassword, setLinkPassword] = useState('');
@@ -133,80 +130,6 @@ const UploadCard = ({ session }) => {
   const uploadFile = async (fileToUpload) => {
     setError('');
 
-    // --- SECURITY INTERCEPT ---
-    // Applies to both modes. A share link puts a file in our bucket and hands
-    // out a public URL, so it needs the same proof of identity as an email.
-    //
-    // Skipped entirely when signed in with Google: that token already proves
-    // the account belongs to involve.no, and the backend re-verifies it on
-    // every request regardless of what happens here.
-    if (!session) {
-
-      if (!emailFrom.toLowerCase().endsWith('@involve.no')) {
-        setError('Kun @involve.no-adresser kan sende filer.');
-        setStatus('ERROR');
-        return;
-      }
-
-      if (!isOtpSent) {
-        setStatus('UPLOADING');
-        try {
-          const res = await fetch(`${API_BASE}/request-code`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ emailFrom })
-          });
-
-          if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(errorData.error || 'Kunne ikke sende kode');
-          }
-
-          setIsOtpSent(true);
-          setStatus('IDLE');
-          return; // Stop here and wait for user to type code
-        } catch (err) {
-          setError(err.message);
-          setStatus('ERROR');
-          return;
-        }
-      }
-
-      // Ensure code is typed and verified BEFORE uploading
-      if (isOtpSent) {
-        if (!otp) {
-          setError('Vennligst skriv inn den 6-sifrede koden du fikk på e-post.');
-          setStatus('ERROR');
-          return;
-        }
-
-        // Verify the code with the server
-        setStatus('UPLOADING'); // Show spinner while checking
-        try {
-          const verifyRes = await fetch(`${API_BASE}/verify-code`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ emailFrom, otp })
-          });
-
-          if (!verifyRes.ok) {
-            const body = await verifyRes.json().catch(() => ({}));
-            throw new Error(body.error || 'Feil kode. Prøv igjen.');
-          }
-
-          // Proof of verification for the rest of the transfer. Held in state
-          // only — deliberately not persisted, so closing the app ends it.
-          const { token } = await verifyRes.json();
-          if (token) sessionTokenRef.current = token;
-        } catch (err) {
-          setError(err.message);
-          setStatus('ERROR');
-          return; // STOPS the upload process completely
-        }
-      }
-
-    } // <--- CLOSES HERE (Moved from the top)
-    // --- END SECURITY INTERCEPT ---
 
     // ... rest of upload logic (generate URL, etc.)
 
@@ -282,11 +205,9 @@ const UploadCard = ({ session }) => {
             headers: { 'Content-Type': 'application/json', ...authHeaders() },
             body: JSON.stringify({
               emailTo,
-              emailFrom,
               message,
               downloadUrl,
               fileName: fileToUpload.name, // <--- ADD THIS HERE
-              otp,
               requireReceipt, // <--- ADD THIS LINE
             })
           });
@@ -320,11 +241,7 @@ const UploadCard = ({ session }) => {
     setError('');
     setEmailTo('');
     setMessage('');
-    setIsOtpSent(false); // <--- ADD THIS
-    setOtp('');          // <--- ADD THIS
     setLinkPassword('');
-    // Keep the Google session; only the code-based one is per-transfer.
-    if (!session) sessionTokenRef.current = null;
   };
 
   return (
@@ -500,42 +417,6 @@ const UploadCard = ({ session }) => {
                   )}
                 </AnimatePresence>
 
-                {/* Sender identity. Hidden when signed in — we already know who
-                    this is, and letting them type a different address would be
-                    rejected by the backend anyway. */}
-                {!session && (
-                  <div className="relative">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sand/70" size={18} />
-                    <input
-                      type="email"
-                      placeholder="Din e-post (@involve.no)"
-                      value={emailFrom}
-                      onChange={(e) => setEmailFrom(e.target.value)}
-                      disabled={isOtpSent} // Locks the email field once the code is sent
-                      className="w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand focus:outline-none disabled:opacity-50"
-                    />
-                  </div>
-                )}
-
-                {!session && isOtpSent && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="relative"
-                  >
-                    <Key className="absolute left-3.5 top-[calc(50%-10px)] -translate-y-1/2 text-brand" size={18} />
-                    <input
-                      type="text"
-                      placeholder="Skriv inn 6-sifret kode fra e-post"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      maxLength={6}
-                      className="w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand focus:outline-none"
-                    />
-                    <p className="text-xs text-brand/70 mt-2 ml-1">Sjekk innboksen til {emailFrom} for koden.</p>
-                  </motion.div>
-                )}
-
                 {/* The message only travels with an email, so it's hidden when
                     the user just wants a link. */}
                 {transferMode === 'EMAIL' && (
@@ -610,12 +491,8 @@ const UploadCard = ({ session }) => {
                     : 'bg-sand/5 text-sand/40 cursor-not-allowed'
                     }`}
                 >
-                  {!session && !isOtpSent
-                    ? <Key size={18} />
-                    : (transferMode === 'EMAIL' ? <Send size={18} /> : <LinkIcon size={18} />)}
-                  {!session && !isOtpSent
-                    ? 'Send kode til e-posten din'
-                    : (transferMode === 'EMAIL' ? 'Overfør via e-post' : 'Hent lenke')}
+                  {transferMode === 'EMAIL' ? <Send size={18} /> : <LinkIcon size={18} />}
+                  {transferMode === 'EMAIL' ? 'Overfør via e-post' : 'Hent lenke'}
                 </button>
               </div>
             </motion.div>
