@@ -12,6 +12,35 @@ import { API_BASE } from '../lib/api';
 
 const HISTORY_LIMIT = 25;
 
+/**
+ * Names a multi-file bundle after its first file plus a count, e.g.
+ * "Rapport_og_3_flere.zip".
+ *
+ * The previous fixed name told the recipient nothing — not what was inside,
+ * nor which batch it was when several arrived the same day.
+ */
+const zipNameFor = (files) => {
+  const base = files[0].name
+    .replace(/\.[^.]+$/, '')            // drop the extension
+    .replace(/[^\p{L}\p{N} _-]/gu, '')  // keep letters, numbers, space, _ and -
+    .trim()
+    .replace(/\s+/g, '_')
+    .slice(0, 40);
+
+  const others = files.length - 1;
+  const suffix = others === 1 ? 'og_1_til' : `og_${others}_flere`;
+  return `${base || 'Filer'}_${suffix}.zip`;
+};
+
+/**
+ * Must produce byte-identical output to the server's version — this value is
+ * part of the presigned signature, so a mismatch fails the upload.
+ */
+const contentDispositionFor = (fileName) => {
+  const ascii = String(fileName).replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '');
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+};
+
 const formatBytes = (bytes) => {
   if (!bytes) return '0 B';
   const units = ['B', 'kB', 'MB', 'GB', 'TB'];
@@ -159,7 +188,7 @@ const UploadCard = ({ session }) => {
         setZipProgress(metadata.percent)
       );
       // Convert the blob into a File object so the rest of your app knows how to handle it
-      const zipFile = new File([zipContent], 'Drop_Involve_Filer.zip', { type: 'application/zip' });
+      const zipFile = new File([zipContent], zipNameFor(files), { type: 'application/zip' });
 
       handleFileValidation(zipFile);
     } catch {
@@ -215,7 +244,7 @@ const UploadCard = ({ session }) => {
         xhrRef,
         headers: {
           'Content-Type': fileToUpload.type || 'application/octet-stream',
-          'Content-Disposition': `attachment; filename="${encodeURIComponent(fileToUpload.name)}"`,
+          'Content-Disposition': contentDispositionFor(fileToUpload.name),
         },
         onProgress: (loaded, total) => {
           const elapsed = (Date.now() - startedAt) / 1000;
