@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileCheck, Copy, Loader2, Link as LinkIcon,
   AlertCircle, X, Plus, Mail, MessageSquare, CheckCircle2,
-  Clock, Send, User, Key, History as HistoryIcon // <--- Added Key here
+  Clock, Send, User, Key, Lock, History as HistoryIcon // <--- Added Key here
 } from 'lucide-react';
 import { readList, writeJson, STORAGE_KEYS } from '../lib/storage';
 import { API_BASE } from '../lib/api';
@@ -32,6 +32,7 @@ const UploadCard = ({ session }) => {
   const [otp, setOtp] = useState('');                // <--- NEW
   const [message, setMessage] = useState('');
   const [expiry, setExpiry] = useState(7);
+  const [linkPassword, setLinkPassword] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   // A ref rather than state: the token is issued and used inside one async
   // function, so it must be readable immediately, and nothing renders from it.
@@ -239,10 +240,18 @@ const UploadCard = ({ session }) => {
       if (!uploadRes.ok) throw new Error('Upload failed');
 
       const expiresInSeconds = expiry * 24 * 60 * 60;
-      const downloadRes = await fetch(
-        `${API_BASE}/generate-download-url?objectKey=${objectKey}&expiresIn=${expiresInSeconds}`,
-        { headers: authHeaders() }
-      );
+      // POST rather than GET: a link password must not travel in a query
+      // string, where it would end up in server logs and browser history.
+      const downloadRes = await fetch(`${API_BASE}/generate-download-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          objectKey,
+          expiresIn: expiresInSeconds,
+          fileName: fileToUpload.name,
+          password: linkPassword || undefined,
+        }),
+      });
       if (!downloadRes.ok) throw new Error('Failed to generate link');
       const { downloadUrl } = await downloadRes.json();
 
@@ -313,7 +322,9 @@ const UploadCard = ({ session }) => {
     setMessage('');
     setIsOtpSent(false); // <--- ADD THIS
     setOtp('');          // <--- ADD THIS
-    sessionTokenRef.current = null;
+    setLinkPassword('');
+    // Keep the Google session; only the code-based one is per-transfer.
+    if (!session) sessionTokenRef.current = null;
   };
 
   return (
@@ -568,6 +579,30 @@ const UploadCard = ({ session }) => {
                       <option value={7} className="bg-ink">Utløper om 7 dager</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Optional password. Deliberately not sent in the email — the
+                    point is that it travels by a different route. */}
+                <div>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sand/70" size={18} />
+                    <input
+                      type="password"
+                      placeholder="Passord på lenken (valgfritt)"
+                      value={linkPassword}
+                      onChange={(e) => setLinkPassword(e.target.value)}
+                      minLength={6}
+                      autoComplete="new-password"
+                      className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none"
+                    />
+                  </div>
+                  {linkPassword && (
+                    <p className="text-xs text-sand/50 mt-2 ml-1">
+                      {linkPassword.length < 6
+                        ? 'Minst 6 tegn.'
+                        : 'Del passordet med mottakeren på en annen måte enn e-post.'}
+                    </p>
+                  )}
                 </div>
 
                 <button
