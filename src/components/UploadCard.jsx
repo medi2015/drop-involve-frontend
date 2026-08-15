@@ -1,16 +1,19 @@
 
 import JSZip from 'jszip'; // <--- ADD THIS
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileCheck, Copy, Loader2, Link as LinkIcon,
   AlertCircle, X, Mail, MessageSquare, CheckCircle2,
-  Clock, Send, Lock, History as HistoryIcon
+  Clock, Send, Lock, Trash2, History as HistoryIcon
 } from 'lucide-react';
 import { readList, writeJson, STORAGE_KEYS } from '../lib/storage';
 import { API_BASE } from '../lib/api';
 
-const HISTORY_LIMIT = 25;
+const formatWhen = (timestamp) =>
+  new Date(timestamp).toLocaleString('no-NO', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
 
 /**
  * Names a multi-file bundle after its first file plus a count, e.g.
@@ -114,11 +117,16 @@ const UploadCard = ({ session }) => {
   // App renders the login screen instead when it's absent, and signing out
   // unmounts us.
   const sessionTokenRef = useRef(session?.token || null);
-  // --- HISTORY STATE ---
+  // --- HISTORY ---
+  // Held on the server, keyed to the Google account, so it's the same list on
+  // the website and in the desktop app. It used to live in localStorage, which
+  // is scoped per origin — tauri://localhost and drop.involve.no are separate
+  // stores, so the two never matched.
   const [showHistory, setShowHistory] = useState(false);
-  // Only the 25 most recent. readList never throws, so corrupt storage costs
-  // the user their history rather than the entire app.
-  const [history, setHistory] = useState(() => readList(STORAGE_KEYS.history, HISTORY_LIMIT));
+  const [history, setHistory] = useState([]);
+  const [historyState, setHistoryState] = useState('loading'); // loading | ready | error
+  const [confirmRevoke, setConfirmRevoke] = useState(null);
+  const [revoking, setRevoking] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   // Real transfer progress, replacing the bar that always animated to 70%.
   const [progress, setProgress] = useState({ loaded: 0, total: 0, bytesPerSecond: 0 });
@@ -137,6 +145,51 @@ const UploadCard = ({ session }) => {
 
   const authHeaders = () =>
     sessionTokenRef.current ? { Authorization: `Bearer ${sessionTokenRef.current}` } : {};
+
+  // No synchronous setState here: the state already starts as 'loading', and
+  // setting it again on mount would be a render-cascade the linter rightly
+  // objects to. reloadHistory below adds it back for manual retries.
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/history`, { headers: authHeaders() });
+      if (!res.ok) throw new Error('Kunne ikke hente historikk.');
+      const { items } = await res.json();
+      setHistory(Array.isArray(items) ? items : []);
+      setHistoryState('ready');
+    } catch {
+      setHistoryState('error');
+    }
+  }, []);
+
+  const loadHistory = useCallback(() => {
+    setHistoryState('loading');
+    return fetchHistory();
+  }, [fetchHistory]);
+
+  useEffect(() => {
+    // The lint rule flags any state-setting call from an effect, but every
+    // setState in fetchHistory happens after an await — which is exactly how
+    // data loading is meant to work, and causes no render cascade.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchHistory();
+  }, [fetchHistory]);
+
+  const revokeLink = async (shortId) => {
+    setRevoking(shortId);
+    try {
+      const res = await fetch(`${API_BASE}/history/${encodeURIComponent(shortId)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error();
+      setHistory((items) => items.filter((item) => item.id !== shortId));
+    } catch {
+      setHistoryState('error');
+    } finally {
+      setRevoking(null);
+      setConfirmRevoke(null);
+    }
+  };
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -275,21 +328,8 @@ const UploadCard = ({ session }) => {
       setDownloadUrl(downloadUrl);
       setStatus('SUCCESS');
 
-      // --- NEW HISTORY LOGIC ---
-      const newTransfer = {
-        id: Date.now(),
-        fileName: fileToUpload.name,
-        url: downloadUrl,
-        date: new Date().toLocaleDateString('no-NO', {
-          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        })
-      };
-
-      // Newest first, capped so storage can't grow without bound
-      const updatedHistory = [newTransfer, ...history].slice(0, HISTORY_LIMIT);
-      setHistory(updatedHistory);
-      writeJson(STORAGE_KEYS.history, updatedHistory);
-      // -------------------------
+      // The server recorded this against the account already; just refresh.
+      loadHistory();
 
       // --- NEW EMAIL LOGIC ---
       if (transferMode === 'EMAIL' && emailTo && emailFrom) {
@@ -368,35 +408,85 @@ const UploadCard = ({ session }) => {
         {showHistory && (
           <div className="w-full h-full flex flex-col min-h-[280px] z-10">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-sand flex items-center gap-2">
-                <HistoryIcon className="text-brand" /> Tidligere overføringer
+              <h2 className="text-base font-medium text-sand flex items-center gap-2">
+                <HistoryIcon className="text-brand" size={18} /> Tidligere overføringer
               </h2>
               <button
                 onClick={() => setShowHistory(false)}
-                className="text-sand/60 hover:text-sand bg-sand/5 p-2 rounded-full transition-colors"
+                aria-label="Lukk historikk"
+                className="text-sand/60 hover:text-sand hover:bg-sand/5 p-2 rounded-lg transition-colors"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-              {history.map((item) => (
-                <div key={item.id} className="bg-sand/5 border border-sand/10 p-4 rounded-xl flex items-center justify-between group hover:bg-sand/10 transition-colors w-full">
-                  <div className="overflow-hidden pr-4 max-w-[60%]">
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+              {historyState === 'loading' && (
+                <p className="text-sand/50 text-sm text-center py-8">Henter historikk…</p>
+              )}
+
+              {historyState === 'error' && (
+                <p className="text-rose-400/80 text-sm text-center py-8">
+                  Kunne ikke hente historikken.{' '}
+                  <button onClick={loadHistory} className="underline hover:text-rose-300">
+                    Prøv igjen
+                  </button>
+                </p>
+              )}
+
+              {historyState === 'ready' && history.length === 0 && (
+                <p className="text-sand/50 text-sm text-center py-8">Ingen overføringer ennå.</p>
+              )}
+
+              {historyState === 'ready' && history.map((item) => (
+                <div key={item.id} className="surface-inset p-3 rounded-lg flex items-center gap-3 w-full">
+                  <div className="overflow-hidden flex-1 min-w-0">
                     <p className="text-sand font-medium truncate text-sm">{item.fileName}</p>
-                    <p className="text-sand/50 text-xs mt-1">{item.date}</p>
+                    <p className="text-sand/50 text-xs mt-0.5">
+                      {formatWhen(item.createdAt)}
+                      {item.hasPassword && ' · passordbeskyttet'}
+                    </p>
                   </div>
 
-                  <button
-                    onClick={() => handleCopyLink(item.url, item.id)}
-                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-[#F5FF8C]/10 text-[#F5FF8C] rounded-lg hover:bg-[#F5FF8C] hover:text-ink-deep transition-colors font-medium text-sm"
-                  >
-                    {copiedId === item.id ? (
-                      <><CheckCircle2 size={16} /> Kopiert</>
-                    ) : (
-                      <><Copy size={16} /> Kopier</>
-                    )}
-                  </button>
+                  {confirmRevoke === item.id ? (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-sand/60 hidden sm:inline">Slette?</span>
+                      <button
+                        onClick={() => revokeLink(item.id)}
+                        disabled={revoking === item.id}
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 transition-colors text-xs font-medium disabled:opacity-50"
+                      >
+                        {revoking === item.id ? 'Sletter…' : 'Ja, slett'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmRevoke(null)}
+                        className="px-2.5 py-1.5 rounded-lg text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors text-xs"
+                      >
+                        Avbryt
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleCopyLink(item.url, item.id)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-brand/10 text-brand rounded-lg hover:bg-brand hover:text-ink-deep transition-colors font-medium text-xs"
+                      >
+                        {copiedId === item.id ? (
+                          <><CheckCircle2 size={14} /> Kopiert</>
+                        ) : (
+                          <><Copy size={14} /> Kopier</>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setConfirmRevoke(item.id)}
+                        aria-label="Trekk tilbake lenken"
+                        title="Trekk tilbake lenken"
+                        className="p-1.5 rounded-lg text-sand/40 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -434,14 +524,12 @@ const UploadCard = ({ session }) => {
                     </button>
                   </div>
 
-                  {history.length > 0 && (
-                    <button
-                      onClick={() => setShowHistory(true)}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors"
-                    >
-                      <HistoryIcon size={15} /> Historikk
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setShowHistory(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors"
+                  >
+                    <HistoryIcon size={15} /> Historikk
+                  </button>
                 </div>
                 <label
                   data-dragging={isDragging}
