@@ -1,14 +1,16 @@
 
 import JSZip from 'jszip'; // <--- ADD THIS
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileCheck, Copy, Loader2, Link as LinkIcon,
-  AlertCircle, X, Plus, Mail, MessageSquare, CheckCircle2,
+  AlertCircle, X, Mail, MessageSquare, CheckCircle2,
   Clock, Send, Lock, History as HistoryIcon
 } from 'lucide-react';
 import { readList, writeJson, STORAGE_KEYS } from '../lib/storage';
 import { API_BASE } from '../lib/api';
+
+const HISTORY_LIMIT = 25;
 
 /**
  * @param {{session: {token: string, user: {email: string, name?: string}}}} props
@@ -18,7 +20,6 @@ const UploadCard = ({ session }) => {
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('IDLE'); // IDLE, UPLOADING, SUCCESS, ERROR
   const [transferMode, setTransferMode] = useState('EMAIL'); // EMAIL, LINK
-  const [objectKey, setObjectKey] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
   const [requireReceipt, setRequireReceipt] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +27,7 @@ const UploadCard = ({ session }) => {
   // Always known: nothing renders until the user has signed in.
   const emailFrom = session.user.email;
   const [emailTo, setEmailTo] = useState('');
-  const [savedContacts, setSavedContacts] = useState([]); // <--- NEW
+  const [savedContacts, setSavedContacts] = useState(() => readList(STORAGE_KEYS.contacts));
   const [message, setMessage] = useState('');
   const [expiry, setExpiry] = useState(7);
   const [linkPassword, setLinkPassword] = useState('');
@@ -40,14 +41,10 @@ const UploadCard = ({ session }) => {
   const sessionTokenRef = useRef(session?.token || null);
   // --- HISTORY STATE ---
   const [showHistory, setShowHistory] = useState(false);
-  // Only load the 50 most recent. readList never throws, so corrupt storage
-  // costs the user their history rather than the entire app.
-  const [history, setHistory] = useState(() => readList(STORAGE_KEYS.history, 50));
+  // Only the 25 most recent. readList never throws, so corrupt storage costs
+  // the user their history rather than the entire app.
+  const [history, setHistory] = useState(() => readList(STORAGE_KEYS.history, HISTORY_LIMIT));
   const [copiedId, setCopiedId] = useState(null);
-
-  useEffect(() => {
-    setSavedContacts(readList(STORAGE_KEYS.contacts));
-  }, []);
 
   const authHeaders = () =>
     sessionTokenRef.current ? { Authorization: `Bearer ${sessionTokenRef.current}` } : {};
@@ -102,7 +99,7 @@ const UploadCard = ({ session }) => {
       const zipFile = new File([zipContent], 'Drop_Involve_Filer.zip', { type: 'application/zip' });
 
       handleFileValidation(zipFile);
-    } catch (error) {
+    } catch {
       setError('Kunne ikke komprimere filene. Prøv igjen.');
       setStatus('ERROR');
     }
@@ -147,7 +144,6 @@ const UploadCard = ({ session }) => {
 
       if (!res.ok) throw new Error('Failed to get upload URL');
       const { uploadUrl, objectKey } = await res.json();
-      setObjectKey(objectKey);
 
       const uploadRes = await fetch(uploadUrl, {
         method: 'PUT',
@@ -191,8 +187,8 @@ const UploadCard = ({ session }) => {
         })
       };
 
-      // Add to the top of the list, keep only the 50 most recent
-      const updatedHistory = [newTransfer, ...history].slice(0, 50);
+      // Newest first, capped so storage can't grow without bound
+      const updatedHistory = [newTransfer, ...history].slice(0, HISTORY_LIMIT);
       setHistory(updatedHistory);
       writeJson(STORAGE_KEYS.history, updatedHistory);
       // -------------------------
@@ -308,7 +304,7 @@ const UploadCard = ({ session }) => {
                   rather than in its own full-width row, so the form column on
                   the right starts at the same height and the card loses a row. */}
               <div className="flex-1 w-full flex flex-col gap-3">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <div className="flex bg-sand/5 p-1 rounded-lg">
                     <button
                       onClick={() => setTransferMode('EMAIL')}
@@ -327,11 +323,9 @@ const UploadCard = ({ session }) => {
                   {history.length > 0 && (
                     <button
                       onClick={() => setShowHistory(true)}
-                      aria-label="Vis historikk"
-                      title="Vis historikk"
-                      className="ml-auto p-2 rounded-lg text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors"
                     >
-                      <HistoryIcon size={16} />
+                      <HistoryIcon size={15} /> Historikk
                     </button>
                   )}
                 </div>
