@@ -73,4 +73,5 @@ export const writeJson = (key, value) => {
 export const STORAGE_KEYS = {
   history: 'dropInvolveHistory',
   contacts: 'dropInvolveContacts',
+  session: 'dropInvolveSession',
 };

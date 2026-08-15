@@ -8,18 +8,14 @@ import {
   Clock, Send, User, Key, History as HistoryIcon // <--- Added Key here
 } from 'lucide-react';
 import { readList, writeJson, STORAGE_KEYS } from '../lib/storage';
+import { API_BASE } from '../lib/api';
 
-// Production backend, served from the Vultr VPS behind nginx.
-//
-// Previously this pointed at Render's free tier, which sleeps after 15 minutes
-// idle and takes 30-60s to wake — that cold start was the long wait before a
-// verification code arrived. The VPS runs continuously and costs nothing extra.
-//
-// Render still runs the same code as a fallback for desktop builds older than
-// 0.1.19, which have the old URL compiled in.
-const API_BASE = import.meta.env.VITE_API_URL || 'https://file.involve.no';
-
-const UploadCard = () => {
+/**
+ * @param {{session?: {token: string, user: {email: string, name?: string}}}} props
+ *   Present when signed in with Google (web). Absent on desktop, which still
+ *   verifies by email code until it gets its own OAuth flow.
+ */
+const UploadCard = ({ session }) => {
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('IDLE'); // IDLE, UPLOADING, SUCCESS, ERROR
   const [transferMode, setTransferMode] = useState('EMAIL'); // EMAIL, LINK
@@ -28,7 +24,8 @@ const UploadCard = () => {
   const [requireReceipt, setRequireReceipt] = useState(false);
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
-  const [emailFrom, setEmailFrom] = useState('');
+  // Known already when signed in; typed by hand only on desktop.
+  const [emailFrom, setEmailFrom] = useState(session?.user?.email || '');
   const [emailTo, setEmailTo] = useState('');
   const [savedContacts, setSavedContacts] = useState([]); // <--- NEW
   const [isOtpSent, setIsOtpSent] = useState(false); // <--- NEW
@@ -38,7 +35,11 @@ const UploadCard = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   // A ref rather than state: the token is issued and used inside one async
   // function, so it must be readable immediately, and nothing renders from it.
-  const sessionTokenRef = useRef(null);
+  // Seeded from the Google session when there is one. No effect keeps these in
+  // sync because the session can't change while this component is mounted —
+  // App renders the login screen instead when it's absent, and signing out
+  // unmounts us.
+  const sessionTokenRef = useRef(session?.token || null);
   // --- HISTORY STATE ---
   const [showHistory, setShowHistory] = useState(false);
   // Only load the 50 most recent. readList never throws, so corrupt storage
@@ -134,7 +135,11 @@ const UploadCard = () => {
     // --- SECURITY INTERCEPT ---
     // Applies to both modes. A share link puts a file in our bucket and hands
     // out a public URL, so it needs the same proof of identity as an email.
-    {
+    //
+    // Skipped entirely when signed in with Google: that token already proves
+    // the account belongs to involve.no, and the backend re-verifies it on
+    // every request regardless of what happens here.
+    if (!session) {
 
       if (!emailFrom.toLowerCase().endsWith('@involve.no')) {
         setError('Kun @involve.no-adresser kan sende filer.');
@@ -487,22 +492,24 @@ const UploadCard = () => {
                   )}
                 </AnimatePresence>
 
-                {/* Sender identity and verification. Outside the EMAIL block on
-                    purpose: a share link uploads a file and publishes a URL, so
-                    it needs the same proof of identity an email does. */}
-                <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sand/70" size={18} />
-                  <input
-                    type="email"
-                    placeholder="Din e-post (@involve.no)"
-                    value={emailFrom}
-                    onChange={(e) => setEmailFrom(e.target.value)}
-                    disabled={isOtpSent} // Locks the email field once the code is sent
-                    className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none disabled:opacity-50"
-                  />
-                </div>
+                {/* Sender identity. Hidden when signed in — we already know who
+                    this is, and letting them type a different address would be
+                    rejected by the backend anyway. */}
+                {!session && (
+                  <div className="relative">
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sand/70" size={18} />
+                    <input
+                      type="email"
+                      placeholder="Din e-post (@involve.no)"
+                      value={emailFrom}
+                      onChange={(e) => setEmailFrom(e.target.value)}
+                      disabled={isOtpSent} // Locks the email field once the code is sent
+                      className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none disabled:opacity-50"
+                    />
+                  </div>
+                )}
 
-                {isOtpSent && (
+                {!session && isOtpSent && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -571,12 +578,12 @@ const UploadCard = () => {
                     : 'bg-sand/5 text-sand/40 cursor-not-allowed'
                     }`}
                 >
-                  {!isOtpSent
+                  {!session && !isOtpSent
                     ? <Key size={18} />
                     : (transferMode === 'EMAIL' ? <Send size={18} /> : <LinkIcon size={18} />)}
-                  {!isOtpSent
+                  {!session && !isOtpSent
                     ? 'Send kode til e-posten din'
-                    : (transferMode === 'EMAIL' ? 'Bekreft og send e-post' : 'Bekreft og hent lenke')}
+                    : (transferMode === 'EMAIL' ? 'Overfør via e-post' : 'Hent lenke')}
                 </button>
               </div>
             </motion.div>

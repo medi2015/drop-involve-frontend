@@ -11,7 +11,10 @@ import {
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import UploadCard from './components/UploadCard';
+import LoginScreen from './components/LoginScreen';
 import { readList, STORAGE_KEYS } from './lib/storage';
+import { loadSession, saveSession, clearSession } from './lib/auth';
+import { isDesktop } from './lib/api';
 import { enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { check } from '@tauri-apps/plugin-updater';
 import { ask } from '@tauri-apps/plugin-dialog';
@@ -109,6 +112,16 @@ const TrayHistory = () => {
 // --- MAIN APP COMPONENT ---
 const App = () => {
   const [isTray, setIsTray] = useState(false);
+  // Restored synchronously so a signed-in user never sees the login screen
+  // flash on load.
+  const [session, setSession] = useState(() => loadSession());
+
+  const handleSignedIn = (payload) => setSession(saveSession(payload));
+
+  const handleSignOut = () => {
+    clearSession();
+    setSession(null);
+  };
 
   // 1. UPDATER LOGIC
   useEffect(() => {
@@ -157,6 +170,13 @@ const App = () => {
     return <TrayHistory />;
   }
 
+  // Gate the web app behind Google sign-in. The desktop app can't use Google
+  // Identity Services — a tauri:// window isn't a valid authorised origin — so
+  // it keeps the email-code flow until it gets the loopback OAuth treatment.
+  if (!isDesktop() && !session) {
+    return <LoginScreen onSignedIn={handleSignedIn} />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-8 md:px-10 md:py-12 bg-ink text-sand">
       <main className="w-full max-w-3xl flex-1 flex flex-col">
@@ -179,9 +199,24 @@ const App = () => {
           <p className="text-sm text-sand/60 mt-3">
             Sikre og raske filoverføringer
           </p>
+
+          {session?.user && (
+            <div className="mt-5 flex items-center gap-3 text-sm">
+              <span className="text-sand/70">
+                {session.user.name || session.user.email}
+              </span>
+              <span aria-hidden="true" className="text-sand/25">•</span>
+              <button
+                onClick={handleSignOut}
+                className="text-sand/50 hover:text-brand transition-colors"
+              >
+                Logg ut
+              </button>
+            </div>
+          )}
         </motion.header>
 
-        <UploadCard />
+        <UploadCard session={session} />
 
         <motion.footer
           initial={{ opacity: 0 }}
