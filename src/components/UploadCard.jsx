@@ -166,6 +166,23 @@ const UploadCard = ({ session }) => {
     return fetchHistory();
   }, [fetchHistory]);
 
+  // Opening the panel is the moment the list needs to be current — a transfer
+  // sent from the website won't otherwise show up in an app that's been open.
+  const openHistory = () => {
+    setShowHistory(true);
+    fetchHistory();
+  };
+
+  // Same reasoning for coming back to the window: quietly refresh behind the
+  // panel rather than flashing a loading state at someone who's reading it.
+  useEffect(() => {
+    if (!showHistory) return;
+
+    const onFocus = () => fetchHistory();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [showHistory, fetchHistory]);
+
   useEffect(() => {
     // The lint rule flags any state-setting call from an effect, but every
     // setState in fetchHistory happens after an await — which is exactly how
@@ -525,7 +542,7 @@ const UploadCard = ({ session }) => {
                   </div>
 
                   <button
-                    onClick={() => setShowHistory(true)}
+                    onClick={openHistory}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors"
                   >
                     <HistoryIcon size={15} /> Historikk
