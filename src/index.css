@@ -88,22 +88,27 @@ select option {
   background-color: rgba(245, 255, 140, 0.06);
 }
 
-/* --- Legacy class names -------------------------------------------------
-   Still referenced by markup we haven't rewritten yet. Redefined rather than
-   deleted so nothing breaks mid-refactor; the decorative ones are now inert.
-   Remove these once the markup no longer uses them. */
-.glass {
-  background-color: rgba(248, 245, 236, 0.04);
-  border: 1px solid rgba(248, 245, 236, 0.10);
+/* Scrollbars. The default light-grey bar looks pasted on against the dark
+   green, and is especially obvious in the small tray window. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(248, 245, 236, 0.2) transparent;
 }
 
-.glow-border {
-  border-radius: 1rem;
-  padding: 1px;
-  background: rgba(248, 245, 236, 0.12);
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.orb,
-.grid-pattern {
-  display: none;
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(248, 245, 236, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(248, 245, 236, 0.28);
 }

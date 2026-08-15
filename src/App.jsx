@@ -66,33 +66,38 @@ const TrayHistory = () => {
   };
 
   return (
-    <div className="bg-[#030712] h-screen w-screen text-white p-5 overflow-y-auto border border-white/10 custom-scrollbar select-none">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <History className="text-[#c4d600]" size={18} /> Historikk
+    <div className="bg-ink h-screen w-screen text-sand p-4 overflow-y-auto border border-sand/10 custom-scrollbar select-none">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-bold text-sand flex items-center gap-2">
+          <History className="text-brand" size={17} /> Historikk
         </h2>
         <button
           onClick={handleOpenMain}
-          className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+          aria-label="Åpne hovedvinduet"
+          title="Åpne hovedvinduet"
+          className="p-2 hover:bg-sand/10 rounded-lg text-sand/50 hover:text-sand transition-colors"
         >
-          <Maximize2 size={18} />
+          <Maximize2 size={17} />
         </button>
       </div>
 
       {history.length === 0 ? (
-        <p className="text-slate-500 text-sm text-center mt-10">Ingen overføringer ennå.</p>
+        <p className="text-sand/50 text-sm text-center mt-10">Ingen overføringer ennå.</p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {history.map((item) => (
-            <div key={item.id} className="bg-white/5 border border-white/10 p-3 rounded-xl flex flex-col gap-3 group hover:bg-white/10 transition-colors">
+            <div key={item.id} className="surface p-3 rounded-xl flex flex-col gap-2.5 hover:bg-sand/10 transition-colors">
               <div className="overflow-hidden pr-2">
-                <p className="text-white font-medium truncate text-sm">{item.fileName}</p>
-                <p className="text-slate-500 text-xs mt-0.5">{item.date}</p>
+                <p className="text-sand font-medium truncate text-sm">{item.fileName}</p>
+                <p className="text-sand/50 text-xs mt-0.5">{item.date}</p>
               </div>
 
               <button
                 onClick={() => handleCopyLink(item.url, item.id)}
-                className="flex items-center justify-center gap-2 px-3 py-2 w-full bg-[#c4d600]/10 text-[#c4d600] rounded-lg hover:bg-[#c4d600] hover:text-black transition-colors font-bold text-sm"
+                className={`flex items-center justify-center gap-2 px-3 py-2 w-full rounded-lg transition-colors font-medium text-sm ${copiedId === item.id
+                  ? 'bg-mint text-ink'
+                  : 'bg-brand/10 text-brand hover:bg-brand hover:text-ink-deep'
+                  }`}
               >
                 {copiedId === item.id ? (
                   <><CheckCircle2 size={16} /> Kopiert</>
