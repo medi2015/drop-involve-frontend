@@ -328,42 +328,10 @@ const UploadCard = ({ session }) => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full">
-      {/* Transfer Mode Toggle & History Button */}
-      {status === 'IDLE' && (
-        <div className="flex flex-wrap justify-center items-center gap-4 mb-2">
-
-          {/* Email / Link Toggle */}
-          <div className="flex bg-sand/5 p-1 rounded-lg">
-            <button
-              onClick={() => setTransferMode('EMAIL')}
-              className={`px-5 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${transferMode === 'EMAIL' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
-            >
-              <Send size={15} /> Send e-post
-            </button>
-            <button
-              onClick={() => setTransferMode('LINK')}
-              className={`px-5 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${transferMode === 'LINK' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
-            >
-              <LinkIcon size={15} /> Hent lenke
-            </button>
-          </div>
-
-          {!showHistory && history.length > 0 && (
-            <button
-              onClick={() => setShowHistory(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors text-sm font-medium"
-            >
-              <HistoryIcon size={15} /> Vis historikk
-            </button>
-          )}
-
-        </div>
-      )}
-
+    <div className="flex flex-col items-center w-full">
       <motion.div
         layout
-        className={`w-full surface rounded-2xl p-6 md:p-8 flex flex-col items-center justify-center transition-colors duration-200 relative overflow-hidden min-h-[380px] ${isDragging ? 'border-brand' : ''
+        className={`w-full surface rounded-2xl p-5 md:p-6 flex flex-col items-center justify-center transition-colors duration-200 relative overflow-hidden min-h-[260px] ${isDragging ? 'border-brand' : ''
           }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -372,7 +340,7 @@ const UploadCard = ({ session }) => {
 
         {/* --- 2. HISTORY PANEL --- */}
         {showHistory && (
-          <div className="w-full h-full flex flex-col min-h-[400px] z-10 w-full">
+          <div className="w-full h-full flex flex-col min-h-[280px] z-10">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-sand flex items-center gap-2">
                 <HistoryIcon className="text-brand" /> Tidligere overføringer
@@ -417,26 +385,55 @@ const UploadCard = ({ session }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col md:flex-row items-stretch gap-6 w-full"
+              className="flex flex-col md:flex-row items-stretch gap-5 w-full"
             >
-              {/* Drop Zone */}
-              <div className="flex-1 w-full">
+              {/* Left column: mode toggle sits directly above the drop zone
+                  rather than in its own full-width row, so the form column on
+                  the right starts at the same height and the card loses a row. */}
+              <div className="flex-1 w-full flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex bg-sand/5 p-1 rounded-lg">
+                    <button
+                      onClick={() => setTransferMode('EMAIL')}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${transferMode === 'EMAIL' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
+                    >
+                      <Send size={15} /> Send e-post
+                    </button>
+                    <button
+                      onClick={() => setTransferMode('LINK')}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${transferMode === 'LINK' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
+                    >
+                      <LinkIcon size={15} /> Hent lenke
+                    </button>
+                  </div>
+
+                  {history.length > 0 && (
+                    <button
+                      onClick={() => setShowHistory(true)}
+                      aria-label="Vis historikk"
+                      title="Vis historikk"
+                      className="ml-auto p-2 rounded-lg text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors"
+                    >
+                      <HistoryIcon size={16} />
+                    </button>
+                  )}
+                </div>
                 <label
                   data-dragging={isDragging}
-                  className="dropzone cursor-pointer flex flex-col items-center rounded-xl p-8 h-full min-h-[240px] justify-center relative overflow-hidden"
+                  className="dropzone cursor-pointer flex flex-1 flex-col items-center rounded-xl p-4 min-h-[150px] justify-center relative overflow-hidden"
                 >
-                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center mb-5 transition-colors overflow-hidden ${file ? 'bg-mint text-ink' : 'bg-brand text-ink-deep'}`}>
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-3 transition-colors overflow-hidden ${file ? 'bg-mint text-ink' : 'bg-brand text-ink-deep'}`}>
                     {file ? (
                       file.type.startsWith('image/') ? (
                         <img src={URL.createObjectURL(file)} alt="Forhåndsvisning" className="w-full h-full object-cover" />
                       ) : (
-                        <FileCheck size={28} />
+                        <FileCheck size={22} />
                       )
                     ) : (
-                      <Upload size={28} />
+                      <Upload size={22} />
                     )}
                   </div>
-                  <h3 className="text-lg font-medium text-sand mb-1">{file ? 'Fil valgt' : 'Slipp filene her'}</h3>
+                  <h3 className="text-base font-medium text-sand mb-1">{file ? 'Fil valgt' : 'Slipp filene her'}</h3>
                   <p className="text-sand/50 text-xs text-center max-w-[220px] truncate">
                     {file ? file.name : 'eller klikk for å bla gjennom'}
                   </p>
@@ -445,7 +442,7 @@ const UploadCard = ({ session }) => {
               </div>
 
               {/* Form Side */}
-              <div className="flex-1 w-full space-y-4">
+              <div className="flex-1 w-full space-y-3">
                 <AnimatePresence mode="popLayout">
                   {transferMode === 'EMAIL' && (
                     <motion.div
@@ -466,7 +463,7 @@ const UploadCard = ({ session }) => {
                             setIsDropdownOpen(true);
                           }}
                           onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)} // Delay allows click to register
-                          className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none"
+                          className="w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand focus:outline-none"
                         />
 
                         {/* NEW DROPDOWN MENU */}
@@ -515,7 +512,7 @@ const UploadCard = ({ session }) => {
                       value={emailFrom}
                       onChange={(e) => setEmailFrom(e.target.value)}
                       disabled={isOtpSent} // Locks the email field once the code is sent
-                      className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none disabled:opacity-50"
+                      className="w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand focus:outline-none disabled:opacity-50"
                     />
                   </div>
                 )}
@@ -533,7 +530,7 @@ const UploadCard = ({ session }) => {
                       value={otp}
                       onChange={(e) => setOtp(e.target.value)}
                       maxLength={6}
-                      className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none"
+                      className="w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand focus:outline-none"
                     />
                     <p className="text-xs text-brand/70 mt-2 ml-1">Sjekk innboksen til {emailFrom} for koden.</p>
                   </motion.div>
@@ -548,7 +545,7 @@ const UploadCard = ({ session }) => {
                       placeholder="Din melding"
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand min-h-[100px] resize-none focus:outline-none"
+                      className="w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand min-h-[80px] resize-none focus:outline-none"
                     />
                   </div>
                 )}
@@ -593,7 +590,7 @@ const UploadCard = ({ session }) => {
                       onChange={(e) => setLinkPassword(e.target.value)}
                       minLength={6}
                       autoComplete="new-password"
-                      className="w-full field rounded-lg py-3 pl-11 pr-4 text-sand focus:outline-none"
+                      className="w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand focus:outline-none"
                     />
                   </div>
                   {linkPassword && (
@@ -608,7 +605,7 @@ const UploadCard = ({ session }) => {
                 <button
                   onClick={startTransfer}
                   disabled={!file}
-                  className={`w-full mt-2 px-6 py-4 font-medium text-base rounded-xl transition-colors active:scale-[0.99] flex items-center justify-center gap-2 ${file
+                  className={`w-full mt-1 px-6 py-3 font-medium text-base rounded-xl transition-colors active:scale-[0.99] flex items-center justify-center gap-2 ${file
                     ? 'bg-brand text-ink-deep hover:bg-brand/90'
                     : 'bg-sand/5 text-sand/40 cursor-not-allowed'
                     }`}

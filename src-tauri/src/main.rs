@@ -7,6 +7,8 @@ use tauri_plugin_autostart::MacosLauncher;
 use std::sync::Mutex;
 use std::time::{Instant, Duration};
 
+mod oauth;
+
 // State to track window status and prevent "Focus Fights"
 struct TrayState {
     last_interaction: Mutex<Instant>,
@@ -15,10 +17,15 @@ struct TrayState {
 
 fn main() {
     tauri::Builder::default()
-        .manage(TrayState { 
+        .manage(TrayState {
             last_interaction: Mutex::new(Instant::now() - Duration::from_secs(1)),
             is_visible: Mutex::new(false),
         })
+        .manage(oauth::OauthState::default())
+        .invoke_handler(tauri::generate_handler![
+            oauth::oauth_start,
+            oauth::oauth_wait
+        ])
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())

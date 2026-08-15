@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { API_BASE, GOOGLE_CLIENT_ID } from '../lib/api';
+import { API_BASE, GOOGLE_CLIENT_ID, isDesktop } from '../lib/api';
+import { signInWithGoogleDesktop } from '../lib/desktopAuth';
 
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
 
@@ -22,9 +23,24 @@ const LoginScreen = ({ onSignedIn }) => {
   const [error, setError] = useState('');
   const buttonRef = useRef(null);
 
+  // Desktop signs in through the system browser, so Google's script is never
+  // needed there.
+  const desktop = isDesktop();
+
+  const handleDesktopSignIn = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      onSignedIn(await signInWithGoogleDesktop());
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
   // Load Google's script once.
   useEffect(() => {
-    if (window.google?.accounts?.id) return;
+    if (desktop || window.google?.accounts?.id) return;
 
     const existing = document.getElementById('gsi-client');
     if (existing) {
@@ -41,11 +57,11 @@ const LoginScreen = ({ onSignedIn }) => {
     script.onerror = () =>
       setError('Kunne ikke laste Google-innlogging. Sjekk nettverket og prøv igjen.');
     document.head.appendChild(script);
-  }, []);
+  }, [desktop]);
 
   // Exchange Google's token for one of ours.
   useEffect(() => {
-    if (!scriptReady || !buttonRef.current || !window.google?.accounts?.id) return;
+    if (desktop || !scriptReady || !buttonRef.current || !window.google?.accounts?.id) return;
 
     const handleCredential = async ({ credential }) => {
       setBusy(true);
@@ -86,7 +102,7 @@ const LoginScreen = ({ onSignedIn }) => {
       shape: 'rectangular',
       width: 280,
     });
-  }, [scriptReady, onSignedIn]);
+  }, [desktop, scriptReady, onSignedIn]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-ink text-sand">
@@ -103,18 +119,34 @@ const LoginScreen = ({ onSignedIn }) => {
           Logg inn med Involve-kontoen din for å sende filer.
         </p>
 
-        <div className="min-h-[44px] flex items-center justify-center">
+        <div className="min-h-[44px] w-full flex flex-col items-center justify-center">
           {busy ? (
             <span className="flex items-center gap-2 text-sm text-sand/70">
-              <Loader2 size={16} className="animate-spin" /> Logger inn…
+              <Loader2 size={16} className="animate-spin" />
+              {desktop ? 'Venter på nettleseren…' : 'Logger inn…'}
             </span>
+          ) : desktop ? (
+            <button
+              onClick={handleDesktopSignIn}
+              className="w-full max-w-[280px] px-6 py-3 rounded-lg bg-brand text-ink-deep font-medium hover:bg-brand/90 transition-colors"
+            >
+              Logg inn med Google
+            </button>
           ) : (
-            <div ref={buttonRef} />
-          )}
-          {!scriptReady && !busy && !error && (
-            <span className="text-sm text-sand/50">Laster…</span>
+            <>
+              <div ref={buttonRef} />
+              {!scriptReady && !error && (
+                <span className="text-sm text-sand/50">Laster…</span>
+              )}
+            </>
           )}
         </div>
+
+        {desktop && busy && (
+          <p className="mt-4 text-xs text-sand/50">
+            Fullfør innloggingen i nettleseren som åpnet seg.
+          </p>
+        )}
 
         {error && (
           <p className="mt-5 flex items-start gap-2 text-sm text-rose-400 text-left">

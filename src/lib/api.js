@@ -13,8 +13,12 @@ export const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   '775361670070-lhbie6ojinp3phi3a1tcjmsg1lusnkej.apps.googleusercontent.com';
 
-// Google Identity Services needs an https or http://localhost origin, and a
-// Tauri window is neither. Desktop keeps the email-code flow until it gets the
-// loopback OAuth treatment in its own release.
+// Separate OAuth client for the desktop apps. Google Identity Services needs
+// an https or http://localhost origin and a Tauri window is neither, so desktop
+// uses the loopback flow with this client instead.
+export const GOOGLE_DESKTOP_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_DESKTOP_CLIENT_ID ||
+  '775361670070-pdhk6rnnf8k5pcqeqtpo8cicu5p280di.apps.googleusercontent.com';
+
 export const isDesktop = () =>
   typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__);

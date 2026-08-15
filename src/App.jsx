@@ -14,7 +14,6 @@ import UploadCard from './components/UploadCard';
 import LoginScreen from './components/LoginScreen';
 import { readList, STORAGE_KEYS } from './lib/storage';
 import { loadSession, saveSession, clearSession } from './lib/auth';
-import { isDesktop } from './lib/api';
 import { enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { check } from '@tauri-apps/plugin-updater';
 import { ask } from '@tauri-apps/plugin-dialog';
@@ -170,45 +169,39 @@ const App = () => {
     return <TrayHistory />;
   }
 
-  // Gate the web app behind Google sign-in. The desktop app can't use Google
-  // Identity Services — a tauri:// window isn't a valid authorised origin — so
-  // it keeps the email-code flow until it gets the loopback OAuth treatment.
-  if (!isDesktop() && !session) {
+  // Both web and desktop are gated now. They reach Google differently — the
+  // browser via Identity Services, the desktop app via a loopback redirect —
+  // but both end up with a session issued by our own backend.
+  if (!session) {
     return <LoginScreen onSignedIn={handleSignedIn} />;
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 py-8 md:px-10 md:py-12 bg-ink text-sand">
+    <div className="min-h-screen flex flex-col items-center px-4 py-5 md:px-10 md:py-8 bg-ink text-sand">
       <main className="w-full max-w-3xl flex-1 flex flex-col">
         <motion.header
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center text-center mb-10"
+          className="w-full flex items-center gap-3 mb-5"
         >
-          <div className="flex items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="w-9 h-9 rounded-md bg-brand text-ink-deep flex items-center justify-center text-xl font-bold leading-none"
-            >
-              I
-            </span>
-            <h1 className="text-xl font-bold tracking-wide text-sand leading-none">
-              drop.involve.no
-            </h1>
-          </div>
-          <p className="text-sm text-sand/60 mt-3">
-            Sikre og raske filoverføringer
-          </p>
+          <span
+            aria-hidden="true"
+            className="w-8 h-8 rounded-md bg-brand text-ink-deep flex items-center justify-center text-lg font-bold leading-none shrink-0"
+          >
+            I
+          </span>
+          <h1 className="text-base font-bold tracking-wide text-sand leading-none">
+            drop.involve.no
+          </h1>
 
           {session?.user && (
-            <div className="mt-5 flex items-center gap-3 text-sm">
-              <span className="text-sand/70">
+            <div className="ml-auto flex items-center gap-3 text-sm min-w-0">
+              <span className="text-sand/70 truncate">
                 {session.user.name || session.user.email}
               </span>
-              <span aria-hidden="true" className="text-sand/25">•</span>
               <button
                 onClick={handleSignOut}
-                className="text-sand/50 hover:text-brand transition-colors"
+                className="text-sand/50 hover:text-brand transition-colors shrink-0"
               >
                 Logg ut
               </button>
@@ -222,7 +215,7 @@ const App = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="mt-10 pt-6 border-t border-sand/10 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-sand/50"
+          className="mt-6 pt-4 border-t border-sand/10 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-sand/50"
         >
           <span>Filene lagres kryptert og slettes automatisk</span>
           <a
