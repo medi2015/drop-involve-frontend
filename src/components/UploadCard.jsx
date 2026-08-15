@@ -12,6 +12,52 @@ import { API_BASE } from '../lib/api';
 
 const HISTORY_LIMIT = 25;
 
+const formatBytes = (bytes) => {
+  if (!bytes) return '0 B';
+  const units = ['B', 'kB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+};
+
+const formatDuration = (seconds) => {
+  if (!Number.isFinite(seconds) || seconds < 0) return '';
+  if (seconds < 60) return `${Math.ceil(seconds)} sek`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
+  return `${Math.floor(seconds / 3600)} t ${Math.round((seconds % 3600) / 60)} min`;
+};
+
+/**
+ * PUT with progress reporting.
+ *
+ * fetch() cannot report upload progress — there's no event for it — which is
+ * why the old progress bar was hardcoded to slide to 70%. XMLHttpRequest can,
+ * and it can also be aborted, which makes a cancel button possible.
+ */
+const putWithProgress = (url, file, { headers, onProgress, xhrRef }) =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    if (xhrRef) xhrRef.current = xhr;
+
+    xhr.open('PUT', url);
+    Object.entries(headers || {}).forEach(([key, value]) => xhr.setRequestHeader(key, value));
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded, event.total);
+    };
+
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`Opplasting feilet (${xhr.status})`));
+
+    xhr.onerror = () => reject(new Error('Nettverksfeil under opplasting.'));
+    xhr.ontimeout = () => reject(new Error('Opplastingen tok for lang tid.'));
+    xhr.onabort = () => reject(Object.assign(new Error('Avbrutt'), { aborted: true }));
+
+    xhr.send(file);
+  });
+
 /**
  * @param {{session: {token: string, user: {email: string, name?: string}}}} props
  *   Always present — App renders the sign-in screen instead when it isn't.
@@ -45,6 +91,20 @@ const UploadCard = ({ session }) => {
   // the user their history rather than the entire app.
   const [history, setHistory] = useState(() => readList(STORAGE_KEYS.history, HISTORY_LIMIT));
   const [copiedId, setCopiedId] = useState(null);
+  // Real transfer progress, replacing the bar that always animated to 70%.
+  const [progress, setProgress] = useState({ loaded: 0, total: 0, bytesPerSecond: 0 });
+  const [zipProgress, setZipProgress] = useState(0);
+  const xhrRef = useRef(null);
+
+  const percent = progress.total > 0
+    ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
+    : 0;
+
+  // Only once there's a rate to extrapolate from — an estimate in the first
+  // half-second is meaningless and jumps around.
+  const secondsLeft = progress.bytesPerSecond > 0 && progress.total > progress.loaded
+    ? (progress.total - progress.loaded) / progress.bytesPerSecond
+    : null;
 
   const authHeaders = () =>
     sessionTokenRef.current ? { Authorization: `Bearer ${sessionTokenRef.current}` } : {};
@@ -94,7 +154,10 @@ const UploadCard = ({ session }) => {
         zip.file(file.name, file);
       });
 
-      const zipContent = await zip.generateAsync({ type: 'blob' });
+      setZipProgress(0);
+      const zipContent = await zip.generateAsync({ type: 'blob' }, (metadata) =>
+        setZipProgress(metadata.percent)
+      );
       // Convert the blob into a File object so the rest of your app knows how to handle it
       const zipFile = new File([zipContent], 'Drop_Involve_Filer.zip', { type: 'application/zip' });
 
@@ -145,18 +208,24 @@ const UploadCard = ({ session }) => {
       if (!res.ok) throw new Error('Failed to get upload URL');
       const { uploadUrl, objectKey } = await res.json();
 
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: fileToUpload,
+      const startedAt = Date.now();
+      setProgress({ loaded: 0, total: fileToUpload.size, bytesPerSecond: 0 });
+
+      await putWithProgress(uploadUrl, fileToUpload, {
+        xhrRef,
         headers: {
           'Content-Type': fileToUpload.type || 'application/octet-stream',
-
-          // UPDATE THIS LINE BELOW:
-          'Content-Disposition': `attachment; filename="${encodeURIComponent(fileToUpload.name)}"`
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(fileToUpload.name)}"`,
+        },
+        onProgress: (loaded, total) => {
+          const elapsed = (Date.now() - startedAt) / 1000;
+          setProgress({
+            loaded,
+            total,
+            bytesPerSecond: elapsed > 0.5 ? loaded / elapsed : 0,
+          });
         },
       });
-
-      if (!uploadRes.ok) throw new Error('Upload failed');
 
       const expiresInSeconds = expiry * 24 * 60 * 60;
       // POST rather than GET: a link password must not travel in a query
@@ -220,10 +289,19 @@ const UploadCard = ({ session }) => {
       // -----------------------
 
     } catch (err) {
+      // Cancelling isn't a failure — reset() has already returned us to IDLE.
+      if (err.aborted) return;
       console.error(err);
       setError(err.message);
       setStatus('ERROR');
     }
+  };
+
+  const cancelTransfer = () => {
+    xhrRef.current?.abort();
+    xhrRef.current = null;
+    setProgress({ loaded: 0, total: 0, bytesPerSecond: 0 });
+    setStatus('IDLE');
   };
 
   const copyToClipboard = () => {
@@ -238,12 +316,18 @@ const UploadCard = ({ session }) => {
     setEmailTo('');
     setMessage('');
     setLinkPassword('');
+    setProgress({ loaded: 0, total: 0, bytesPerSecond: 0 });
+    setZipProgress(0);
+    xhrRef.current = null;
   };
 
   return (
     <div className="flex flex-col items-center w-full">
       <motion.div
         layout
+        // A short tween rather than framer's default spring: the card resizes
+        // when switching modes, and a spring overshoots on something this large.
+        transition={{ layout: { duration: 0.2, ease: [0.4, 0, 0.2, 1] } }}
         className={`w-full surface rounded-2xl p-5 md:p-6 flex flex-col items-center justify-center transition-colors duration-200 relative overflow-hidden min-h-[260px] ${isDragging ? 'border-brand' : ''
           }`}
         onDragOver={handleDragOver}
@@ -298,6 +382,7 @@ const UploadCard = ({ session }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
               className="flex flex-col md:flex-row items-stretch gap-5 w-full"
             >
               {/* Left column: mode toggle sits directly above the drop zone
@@ -357,10 +442,16 @@ const UploadCard = ({ session }) => {
                 <AnimatePresence mode="popLayout">
                   {transferMode === 'EMAIL' && (
                     <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-4 overflow-visible"
+                      // Opacity only. Animating height to 'auto' re-measures the
+                      // element every frame and fights the parent's layout
+                      // animation over the same resize — that was the jitter.
+                      // popLayout takes the exiting element out of flow, so the
+                      // card still shrinks smoothly without animating height here.
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="space-y-3 overflow-visible"
                     >
                       {/* Send To Field with Autocomplete Dropdown */}
                       <div className="relative z-50">
@@ -498,13 +589,22 @@ const UploadCard = ({ session }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
               className="flex flex-col items-center w-full max-w-md"
             >
-              <div className="w-24 h-24 rounded-2xl bg-brand/10 flex items-center justify-center mb-8">
-                <Loader2 size={40} className="text-brand animate-spin" />
+              <div className="w-14 h-14 rounded-xl bg-brand/10 flex items-center justify-center mb-4">
+                <Loader2 size={26} className="text-brand animate-spin" />
               </div>
-              <h3 className="text-2xl font-bold text-sand mb-2">Komprimerer filer...</h3>
-              <p className="text-sand/60 mb-8 text-center">Gjør klar en .zip-fil for overføring</p>
+              <h3 className="text-lg font-medium text-sand mb-1">Komprimerer filer</h3>
+              <p className="text-sand/60 text-sm mb-5 text-center">Gjør klar en .zip-fil for overføring</p>
+
+              <div className="w-full bg-sand/5 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-brand transition-[width] duration-200"
+                  style={{ width: `${Math.round(zipProgress)}%` }}
+                />
+              </div>
+              <p className="text-sand/50 text-xs mt-2">{Math.round(zipProgress)} %</p>
             </motion.div>
           )}
 
@@ -514,22 +614,43 @@ const UploadCard = ({ session }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
               className="flex flex-col items-center w-full max-w-md"
             >
-              <div className="w-24 h-24 rounded-2xl bg-brand/10 flex items-center justify-center mb-8">
-                <Loader2 size={40} className="text-brand animate-spin" />
+              <div className="w-14 h-14 rounded-xl bg-brand/10 flex items-center justify-center mb-4">
+                <Loader2 size={26} className="text-brand animate-spin" />
               </div>
-              <h3 className="text-2xl font-bold text-sand mb-2">Overfører...</h3>
-              <p className="text-sand/60 mb-8 truncate w-full text-center">{file?.name}</p>
 
-              <div className="w-full bg-sand/5 h-2 rounded-full overflow-hidden mb-4">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: "70%" }}
-                  className="h-full bg-brand"
+              <h3 className="text-lg font-medium text-sand mb-1">Overfører</h3>
+              <p className="text-sand/60 text-sm mb-5 truncate w-full text-center">{file?.name}</p>
+
+              <div className="w-full flex items-baseline justify-between mb-1.5">
+                <span className="text-2xl font-medium text-sand tabular-nums">{percent} %</span>
+                {progress.total > 0 && (
+                  <span className="text-xs text-sand/50 tabular-nums">
+                    {formatBytes(progress.loaded)} av {formatBytes(progress.total)}
+                  </span>
+                )}
+              </div>
+
+              <div className="w-full bg-sand/5 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-brand transition-[width] duration-200"
+                  style={{ width: `${percent}%` }}
                 />
               </div>
-              <p className="text-brand text-sm font-bold uppercase tracking-widest">Behandler</p>
+
+              <div className="w-full flex items-center justify-between mt-2 text-xs text-sand/50 tabular-nums min-h-[16px]">
+                <span>{progress.bytesPerSecond > 0 && `${formatBytes(progress.bytesPerSecond)}/s`}</span>
+                <span>{secondsLeft !== null && `ca. ${formatDuration(secondsLeft)} igjen`}</span>
+              </div>
+
+              <button
+                onClick={cancelTransfer}
+                className="mt-6 flex items-center gap-2 text-sm text-sand/50 hover:text-sand transition-colors"
+              >
+                <X size={15} /> Avbryt
+              </button>
             </motion.div>
           )}
 
@@ -540,30 +661,38 @@ const UploadCard = ({ session }) => {
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col items-center w-full max-w-md"
             >
-              <div className="w-24 h-24 rounded-full bg-brand/10 flex items-center justify-center mb-8 text-brand">
-                <CheckCircle2 size={48} />
+              <div className="w-14 h-14 rounded-full bg-mint/15 flex items-center justify-center mb-4 text-mint">
+                <CheckCircle2 size={28} />
               </div>
-              <h3 className="text-3xl font-bold text-sand mb-2 text-center">Fullført!</h3>
-              <p className="text-sand/60 mb-10 text-center">
-                {transferMode === 'EMAIL' ? 'E-post er sendt og filen er klar' : 'Filen din er klar for deling'}
+              <h3 className="text-lg font-medium text-sand mb-1 text-center">Fullført</h3>
+              <p className="text-sand/60 text-sm mb-5 text-center">
+                {transferMode === 'EMAIL' ? 'E-posten er sendt og filen er klar' : 'Filen din er klar for deling'}
               </p>
 
-              <div className="w-full bg-sand/5 border border-sand/10 rounded-2xl p-6 mb-8 flex items-center gap-4">
-                <LinkIcon size={24} className="text-brand shrink-0" />
-                <p className="text-sand/90 text-base truncate flex-1 font-mono">{downloadUrl}</p>
+              <div className="w-full surface-inset rounded-lg p-3 mb-4 flex items-center gap-3">
+                <LinkIcon size={17} className="text-brand shrink-0" />
+                <p className="text-sand/90 text-sm truncate flex-1 font-mono">{downloadUrl}</p>
                 <button
                   onClick={copyToClipboard}
-                  className="p-3 hover:bg-brand/10 rounded-xl text-brand transition-colors"
+                  aria-label="Kopier lenke"
+                  title="Kopier lenke"
+                  className="p-2 hover:bg-brand/10 rounded-lg text-brand transition-colors shrink-0"
                 >
-                  <Copy size={24} />
+                  <Copy size={17} />
                 </button>
               </div>
 
+              {linkPassword && (
+                <p className="text-xs text-sand/50 mb-4 text-center">
+                  Lenken er passordbeskyttet. Husk å dele passordet separat.
+                </p>
+              )}
+
               <button
                 onClick={reset}
-                className="text-sand/60 hover:text-sand transition-colors flex items-center gap-2 font-bold"
+                className="text-sm text-sand/60 hover:text-sand transition-colors flex items-center gap-2"
               >
-                <X size={18} /> Lukk og tilbakestill
+                <X size={16} /> Ny overføring
               </button>
             </motion.div>
           )}
@@ -573,17 +702,17 @@ const UploadCard = ({ session }) => {
               key="error"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex flex-col items-center p-8"
+              className="flex flex-col items-center w-full max-w-md"
             >
-              <div className="w-20 h-20 rounded-full bg-rose-500/10 flex items-center justify-center mb-6 text-rose-500">
-                <AlertCircle size={40} />
+              <div className="w-14 h-14 rounded-full bg-rose-500/10 flex items-center justify-center mb-4 text-rose-400">
+                <AlertCircle size={26} />
               </div>
-              <h3 className="text-2xl font-bold text-sand mb-2">Noe gikk galt</h3>
-              <p className="text-rose-400/80 text-center mb-10">{error || 'Kunne ikke fullføre overføringen.'}</p>
+              <h3 className="text-lg font-medium text-sand mb-1">Noe gikk galt</h3>
+              <p className="text-rose-400/80 text-sm text-center mb-5">{error || 'Kunne ikke fullføre overføringen.'}</p>
 
               <button
                 onClick={reset}
-                className="px-10 py-4 bg-sand/5 hover:bg-sand/10 text-sand rounded-2xl font-bold transition-all"
+                className="px-6 py-2.5 bg-sand/5 hover:bg-sand/10 text-sand rounded-lg font-medium text-sm transition-colors"
               >
                 Prøv igjen
               </button>

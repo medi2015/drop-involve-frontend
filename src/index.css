@@ -88,8 +88,21 @@ select option {
   background-color: rgba(245, 255, 140, 0.06);
 }
 
+/* Respect the OS setting. Some people disable animation because motion makes
+   them ill, not because they find it fussy. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Scrollbars. The default light-grey bar looks pasted on against the dark
-   green, and is especially obvious in the small tray window. */
+   green. */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(248, 245, 236, 0.2) transparent;

@@ -35,26 +35,26 @@ class ErrorBoundary extends React.Component {
     if (!error) return this.props.children;
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-900 p-6 text-slate-100">
-        <div className="w-full max-w-md rounded-2xl bg-slate-800 p-8 shadow-xl">
-          <h1 className="mb-2 text-xl font-semibold">Noe gikk galt</h1>
-          <p className="mb-6 text-sm text-slate-400">
+      <div className="flex min-h-screen items-center justify-center bg-ink p-6 text-sand">
+        <div className="w-full max-w-md rounded-2xl surface p-8">
+          <h1 className="mb-2 text-lg font-medium">Noe gikk galt</h1>
+          <p className="mb-6 text-sm text-sand/60">
             Appen klarte ikke å starte. Du kan tilbakestille lokal historikk og
             prøve på nytt &mdash; filene dine i skyen blir ikke berørt.
           </p>
 
           <button
             onClick={this.handleReset}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white transition hover:bg-blue-500"
+            className="w-full rounded-lg bg-brand px-4 py-2.5 font-medium text-ink-deep transition-colors hover:bg-brand/90"
           >
             Tilbakestill og start på nytt
           </button>
 
           <details className="mt-6">
-            <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-300">
+            <summary className="cursor-pointer text-xs text-sand/50 hover:text-sand/80">
               Tekniske detaljer
             </summary>
-            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-900 p-3 text-xs text-slate-400">
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded surface-inset p-3 text-xs text-sand/60">
               {String(error?.stack || error)}
             </pre>
           </details>
