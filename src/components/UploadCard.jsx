@@ -7,7 +7,6 @@ import {
   AlertCircle, X, Mail, MessageSquare, CheckCircle2,
   Clock, Send, Lock, Trash2, History as HistoryIcon
 } from 'lucide-react';
-import { readList, writeJson, STORAGE_KEYS } from '../lib/storage';
 import { API_BASE } from '../lib/api';
 import { uploadInParts, MULTIPART_THRESHOLD } from '../lib/multipart';
 
@@ -112,7 +111,8 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   // Always known: nothing renders until the user has signed in.
   const emailFrom = session.user.email;
   const [emailTo, setEmailTo] = useState('');
-  const [savedContacts, setSavedContacts] = useState(() => readList(STORAGE_KEYS.contacts));
+  // Server-held, so the same suggestions appear on the website and in the app.
+  const [savedContacts, setSavedContacts] = useState([]);
   const [message, setMessage] = useState('');
   const [expiry, setExpiry] = useState(7);
   const [linkPassword, setLinkPassword] = useState('');
@@ -141,6 +141,25 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   // Multipart runs several requests at once; cancelling has to abort them all.
   const activeUploadsRef = useRef(new Set());
 
+  // Filter on the address currently being typed — the part after the last
+  // comma — and hide any already in the field. With nothing typed, show the
+  // most recent so the list is useful before you start.
+  const contactSuggestions = (() => {
+    const alreadyChosen = new Set(
+      emailTo.split(',').map((part) => part.trim().toLowerCase()).filter(Boolean)
+    );
+    const typing = emailTo.split(',').pop().trim().toLowerCase();
+
+    return savedContacts
+      .filter((contact) => {
+        const value = contact.toLowerCase();
+        if (value === typing) return false;
+        if (typing.length === 0) return !alreadyChosen.has(value);
+        return value.includes(typing);
+      })
+      .slice(0, 8);
+  })();
+
   const percent = progress.total > 0
     ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
     : 0;
@@ -168,6 +187,23 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
       setHistoryState('error');
     }
   }, []);
+
+  const fetchContacts = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/contacts`, { headers: authHeaders() });
+      if (!res.ok) return;
+      const { items } = await res.json();
+      setSavedContacts(Array.isArray(items) ? items : []);
+    } catch {
+      // Suggestions are a convenience; failing to load them isn't worth
+      // surfacing an error over.
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchContacts();
+  }, [fetchContacts]);
 
   const loadHistory = useCallback(() => {
     setHistoryState('loading');
@@ -382,11 +418,8 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
               requireReceipt, // <--- ADD THIS LINE
             })
           });
-          const newEmails = emailTo.split(/[,;\s]+/).map(e => e.trim()).filter(e => e.includes('@'));
-          const updatedContacts = [...new Set([...newEmails, ...savedContacts])].slice(0, 10); // Keeps the 10 most recent
-
-          setSavedContacts(updatedContacts);
-          writeJson(STORAGE_KEYS.contacts, updatedContacts);
+          // Recipients are remembered server-side by /send-email.
+          fetchContacts();
         } catch (emailErr) {
           console.error("Email failed to send, but file was uploaded:", emailErr);
           // We don't setStatus('ERROR') here because the file upload actually worked.
@@ -622,37 +655,34 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
                             setEmailTo(e.target.value);
                             setIsDropdownOpen(true);
                           }}
+                          // Suggestions on focus too, not just while typing —
+                          // most sends go to someone you've used before, so the
+                          // list should be reachable without guessing a letter.
+                          onFocus={() => setIsDropdownOpen(true)}
                           onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)} // Delay allows click to register
                           className="w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand focus:outline-none"
                         />
 
-                        {/* NEW DROPDOWN MENU */}
-                        {isDropdownOpen && savedContacts.length > 0 && (
-                          <div className="absolute top-full left-0 w-full mt-2 bg-ink-deep border border-sand/10 rounded-xl overflow-hidden">
-                            {savedContacts
-                              .filter(contact => {
-                                // Only search the word currently being typed (after the last comma)
-                                const currentSearch = emailTo.split(',').pop().trim().toLowerCase();
-                                return currentSearch.length > 0 && contact.toLowerCase().includes(currentSearch) && contact.toLowerCase() !== currentSearch;
-                              })
-                              .map(contact => (
-                                <button
-                                  key={contact}
-                                  type="button"
-                                  onClick={() => {
-                                    const parts = emailTo.split(',');
-                                    parts.pop(); // Remove the partially typed email
-                                    const newVal = parts.length > 0
-                                      ? parts.map(p => p.trim()).join(', ') + `, ${contact}, `
-                                      : `${contact}, `;
-                                    setEmailTo(newVal);
-                                    setIsDropdownOpen(false);
-                                  }}
-                                  className="w-full text-left px-4 py-3 text-sm text-sand/80 hover:bg-brand/20 hover:text-sand transition-colors border-b border-sand/10 last:border-0"
-                                >
-                                  {contact}
-                                </button>
-                              ))}
+                        {isDropdownOpen && contactSuggestions.length > 0 && (
+                          <div className="absolute top-full left-0 w-full mt-2 bg-ink-deep border border-sand/10 rounded-xl overflow-hidden max-h-56 overflow-y-auto custom-scrollbar">
+                            {contactSuggestions.map(contact => (
+                              <button
+                                key={contact}
+                                type="button"
+                                onClick={() => {
+                                  const parts = emailTo.split(',');
+                                  parts.pop(); // Remove the partially typed email
+                                  const newVal = parts.length > 0
+                                    ? parts.map(p => p.trim()).filter(Boolean).concat(contact).join(', ') + ', '
+                                    : `${contact}, `;
+                                  setEmailTo(newVal);
+                                  setIsDropdownOpen(false);
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-sand/80 hover:bg-brand/20 hover:text-sand transition-colors border-b border-sand/10 last:border-0"
+                              >
+                                {contact}
+                              </button>
+                            ))}
                           </div>
                         )}
                       </div>
