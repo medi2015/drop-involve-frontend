@@ -4,6 +4,7 @@ import { Globe, History } from 'lucide-react';
 import UploadCard from './components/UploadCard';
 import LoginScreen from './components/LoginScreen';
 import { loadSession, saveSession, clearSession } from './lib/auth';
+import { getVersion } from '@tauri-apps/api/app';
 import { enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { check } from '@tauri-apps/plugin-updater';
 import { ask } from '@tauri-apps/plugin-dialog';
@@ -15,6 +16,9 @@ const App = () => {
   // flash on load.
   const [session, setSession] = useState(() => loadSession());
   const [showHistory, setShowHistory] = useState(false);
+  // Only meaningful in the desktop app — the website is always whatever was
+  // last deployed, so a version number there would just be noise.
+  const [appVersion, setAppVersion] = useState('');
 
   const handleSignedIn = (payload) => setSession(saveSession(payload));
 
@@ -22,6 +26,14 @@ const App = () => {
     clearSession();
     setSession(null);
   };
+
+  useEffect(() => {
+    getVersion()
+      .then(setAppVersion)
+      .catch(() => {
+        // Running in a browser rather than the desktop app.
+      });
+  }, []);
 
   // Start with the OS. This used to live in the tray component, which no
   // longer exists — without it here, autostart silently stops being enabled.
@@ -138,6 +150,11 @@ const App = () => {
           <span className="hover:text-brand transition-colors cursor-pointer">
             Vilkår og personvern
           </span>
+          {appVersion && (
+            <span className="text-sand/35" title="Appversjon">
+              v{appVersion}
+            </span>
+          )}
         </motion.footer>
       </main>
     </div>

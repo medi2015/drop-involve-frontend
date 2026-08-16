@@ -488,6 +488,11 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
                       {formatWhen(item.createdAt)}
                       {item.hasPassword && ' · passordbeskyttet'}
                     </p>
+                    <p className={`text-xs mt-0.5 ${item.downloads ? 'text-mint' : 'text-sand/40'}`}>
+                      {!item.downloads && 'Ikke lastet ned ennå'}
+                      {item.downloads === 1 && 'Lastet ned 1 gang'}
+                      {item.downloads > 1 && `Lastet ned ${item.downloads} ganger`}
+                    </p>
                   </div>
 
                   {confirmRevoke === item.id ? (
