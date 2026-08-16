@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { readList, writeJson, STORAGE_KEYS } from '../lib/storage';
 import { API_BASE } from '../lib/api';
+import { uploadInParts, MULTIPART_THRESHOLD } from '../lib/multipart';
 
 const formatWhen = (timestamp) =>
   new Date(timestamp).toLocaleString('no-NO', {
@@ -137,6 +138,8 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const [progress, setProgress] = useState({ loaded: 0, total: 0, bytesPerSecond: 0 });
   const [zipProgress, setZipProgress] = useState(0);
   const xhrRef = useRef(null);
+  // Multipart runs several requests at once; cancelling has to abort them all.
+  const activeUploadsRef = useRef(new Set());
 
   const percent = progress.total > 0
     ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
@@ -297,37 +300,51 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
 
     setStatus('UPLOADING');
     try {
-      const res = await fetch(`${API_BASE}/generate-upload-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          // ADD THIS FALLBACK: || 'application/octet-stream'
-          contentType: fileToUpload.type || 'application/octet-stream',
-          fileName: fileToUpload.name,
-        })
-      });
-
-      if (!res.ok) throw new Error('Failed to get upload URL');
-      const { uploadUrl, objectKey } = await res.json();
-
       const startedAt = Date.now();
       setProgress({ loaded: 0, total: fileToUpload.size, bytesPerSecond: 0 });
 
-      await putWithProgress(uploadUrl, fileToUpload, {
-        xhrRef,
-        headers: {
-          'Content-Type': fileToUpload.type || 'application/octet-stream',
-          'Content-Disposition': contentDispositionFor(fileToUpload.name),
-        },
-        onProgress: (loaded, total) => {
-          const elapsed = (Date.now() - startedAt) / 1000;
-          setProgress({
-            loaded,
-            total,
-            bytesPerSecond: elapsed > 0.5 ? loaded / elapsed : 0,
-          });
-        },
-      });
+      const track = (loaded, total) => {
+        const elapsed = (Date.now() - startedAt) / 1000;
+        setProgress({
+          loaded,
+          total,
+          bytesPerSecond: elapsed > 0.5 ? loaded / elapsed : 0,
+        });
+      };
+
+      let objectKey;
+
+      if (fileToUpload.size > MULTIPART_THRESHOLD) {
+        // R2 rejects a single PUT over 4.995 GiB, and even below that a large
+        // upload benefits from parallel parts and per-part retries.
+        objectKey = await uploadInParts(fileToUpload, {
+          authHeaders,
+          onProgress: track,
+          activeUploads: activeUploadsRef,
+        });
+      } else {
+        const res = await fetch(`${API_BASE}/generate-upload-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({
+            contentType: fileToUpload.type || 'application/octet-stream',
+            fileName: fileToUpload.name,
+          })
+        });
+
+        if (!res.ok) throw new Error('Failed to get upload URL');
+        const body = await res.json();
+        objectKey = body.objectKey;
+
+        await putWithProgress(body.uploadUrl, fileToUpload, {
+          xhrRef,
+          headers: {
+            'Content-Type': fileToUpload.type || 'application/octet-stream',
+            'Content-Disposition': contentDispositionFor(fileToUpload.name),
+          },
+          onProgress: track,
+        });
+      }
 
       const expiresInSeconds = expiry * 24 * 60 * 60;
       // POST rather than GET: a link password must not travel in a query
@@ -389,6 +406,11 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const cancelTransfer = () => {
     xhrRef.current?.abort();
     xhrRef.current = null;
+
+    // Multipart has several in flight at once.
+    activeUploadsRef.current.forEach((xhr) => xhr.abort());
+    activeUploadsRef.current.clear();
+
     setProgress({ loaded: 0, total: 0, bytesPerSecond: 0 });
     setStatus('IDLE');
   };
