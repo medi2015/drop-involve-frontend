@@ -91,10 +91,16 @@ const putWithProgress = (url, file, { headers, onProgress, xhrRef }) =>
   });
 
 /**
- * @param {{session: {token: string, user: {email: string, name?: string}}}} props
+ * @param {object} props
+ * @param {{token: string, user: {email: string, name?: string}}} props.session
  *   Always present — App renders the sign-in screen instead when it isn't.
+ * @param {boolean} props.showHistory
+ * @param {(open: boolean) => void} props.setShowHistory
+ *   Owned by App because the button that opens the panel lives in the header —
+ *   in the card it competed for width with the mode toggle and wrapped onto a
+ *   second row under Windows display scaling.
  */
-const UploadCard = ({ session }) => {
+const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('IDLE'); // IDLE, UPLOADING, SUCCESS, ERROR
   const [transferMode, setTransferMode] = useState('EMAIL'); // EMAIL, LINK
@@ -122,7 +128,6 @@ const UploadCard = ({ session }) => {
   // the website and in the desktop app. It used to live in localStorage, which
   // is scoped per origin — tauri://localhost and drop.involve.no are separate
   // stores, so the two never matched.
-  const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyState, setHistoryState] = useState('loading'); // loading | ready | error
   const [confirmRevoke, setConfirmRevoke] = useState(null);
@@ -168,15 +173,13 @@ const UploadCard = ({ session }) => {
 
   // Opening the panel is the moment the list needs to be current — a transfer
   // sent from the website won't otherwise show up in an app that's been open.
-  const openHistory = () => {
-    setShowHistory(true);
-    fetchHistory();
-  };
-
-  // Same reasoning for coming back to the window: quietly refresh behind the
-  // panel rather than flashing a loading state at someone who's reading it.
+  // Same for returning to the window, refreshed quietly so the list doesn't
+  // flash a loading state at someone mid-read.
   useEffect(() => {
     if (!showHistory) return;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchHistory();
 
     const onFocus = () => fetchHistory();
     window.addEventListener('focus', onFocus);
@@ -525,27 +528,21 @@ const UploadCard = ({ session }) => {
                   rather than in its own full-width row, so the form column on
                   the right starts at the same height and the card loses a row. */}
               <div className="flex-1 w-full flex flex-col gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex bg-sand/5 p-1 rounded-lg">
-                    <button
-                      onClick={() => setTransferMode('EMAIL')}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${transferMode === 'EMAIL' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
-                    >
-                      <Send size={15} /> Send e-post
-                    </button>
-                    <button
-                      onClick={() => setTransferMode('LINK')}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${transferMode === 'LINK' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
-                    >
-                      <LinkIcon size={15} /> Hent lenke
-                    </button>
-                  </div>
-
+                {/* The two buttons share the column width rather than sizing to
+                    their own text, so they can't wrap onto a second row when a
+                    machine renders text larger than we assumed. */}
+                <div className="flex w-full bg-sand/5 p-1 rounded-lg">
                   <button
-                    onClick={openHistory}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-sand/60 hover:text-sand hover:bg-sand/5 transition-colors"
+                    onClick={() => setTransferMode('EMAIL')}
+                    className={`flex-1 min-w-0 px-2 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${transferMode === 'EMAIL' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
                   >
-                    <HistoryIcon size={15} /> Historikk
+                    <Send size={15} className="shrink-0" /> Send e-post
+                  </button>
+                  <button
+                    onClick={() => setTransferMode('LINK')}
+                    className={`flex-1 min-w-0 px-2 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${transferMode === 'LINK' ? 'bg-brand text-ink-deep' : 'text-sand/60 hover:text-sand'}`}
+                  >
+                    <LinkIcon size={15} className="shrink-0" /> Hent lenke
                   </button>
                 </div>
                 <label

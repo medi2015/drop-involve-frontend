@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Globe } from 'lucide-react';
+import { Globe, History } from 'lucide-react';
 import UploadCard from './components/UploadCard';
 import LoginScreen from './components/LoginScreen';
 import { loadSession, saveSession, clearSession } from './lib/auth';
@@ -14,6 +14,7 @@ const App = () => {
   // Restored synchronously so a signed-in user never sees the login screen
   // flash on load.
   const [session, setSession] = useState(() => loadSession());
+  const [showHistory, setShowHistory] = useState(false);
 
   const handleSignedIn = (payload) => setSession(saveSession(payload));
 
@@ -90,22 +91,35 @@ const App = () => {
             drop.involve.no
           </h1>
 
-          {session?.user && (
-            <div className="ml-auto flex items-center gap-3 text-sm min-w-0">
-              <span className="text-sand/70 truncate">
-                {session.user.name || session.user.email}
-              </span>
-              <button
-                onClick={handleSignOut}
-                className="text-sand/50 hover:text-brand transition-colors shrink-0"
-              >
-                Logg ut
-              </button>
-            </div>
-          )}
+          <div className="ml-auto flex items-center gap-4 text-sm min-w-0">
+            <button
+              onClick={() => setShowHistory(true)}
+              className="flex items-center gap-2 text-sand/60 hover:text-brand transition-colors shrink-0"
+            >
+              <History size={15} /> Historikk
+            </button>
+
+            {session?.user && (
+              <>
+                <span className="text-sand/70 truncate hidden sm:inline">
+                  {session.user.name || session.user.email}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  className="text-sand/50 hover:text-brand transition-colors shrink-0"
+                >
+                  Logg ut
+                </button>
+              </>
+            )}
+          </div>
         </motion.header>
 
-        <UploadCard session={session} />
+        <UploadCard
+          session={session}
+          showHistory={showHistory}
+          setShowHistory={setShowHistory}
+        />
 
         <motion.footer
           initial={{ opacity: 0 }}
