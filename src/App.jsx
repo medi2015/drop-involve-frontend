@@ -4,6 +4,7 @@ import { Globe, History } from 'lucide-react';
 import UploadCard from './components/UploadCard';
 import LoginScreen from './components/LoginScreen';
 import { loadSession, saveSession, clearSession } from './lib/auth';
+import { API_BASE } from './lib/api';
 import { getVersion } from '@tauri-apps/api/app';
 import { enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { check } from '@tauri-apps/plugin-updater';
@@ -23,6 +24,25 @@ const App = () => {
   const handleSignedIn = (payload) => setSession(saveSession(payload));
 
   const handleSignOut = () => {
+    clearSession();
+    setSession(null);
+  };
+
+  // Ends every session for this account, not just this device — for a lost
+  // laptop, or a machine you signed in on and won't be back to.
+  const handleSignOutEverywhere = async () => {
+    if (!window.confirm('Logge ut av alle enheter? Du må logge inn på nytt overalt.')) return;
+
+    try {
+      await fetch(`${API_BASE}/auth/revoke-sessions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+    } catch {
+      // Sign out locally regardless — leaving them signed in here would be
+      // the wrong failure mode.
+    }
+
     clearSession();
     setSession(null);
   };
@@ -126,6 +146,13 @@ const App = () => {
                   className="text-sand/50 hover:text-brand transition-colors shrink-0"
                 >
                   Logg ut
+                </button>
+                <button
+                  onClick={handleSignOutEverywhere}
+                  title="Avslutter økten på alle enheter"
+                  className="text-sand/35 hover:text-brand transition-colors shrink-0 hidden md:inline"
+                >
+                  Alle enheter
                 </button>
               </>
             )}
