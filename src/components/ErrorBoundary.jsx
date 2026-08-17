@@ -1,5 +1,6 @@
 import React from 'react';
 import { STORAGE_KEYS } from '../lib/storage';
+import { reportError } from '../lib/reportError';
 
 /**
  * Last line of defence. Without this, any error thrown during render unmounts
@@ -17,6 +18,7 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('[ErrorBoundary]', error, info?.componentStack);
+    reportError(error, 'react-render');
   }
 
   handleReset = () => {

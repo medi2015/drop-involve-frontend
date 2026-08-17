@@ -29,7 +29,12 @@ const App = () => {
 
   useEffect(() => {
     getVersion()
-      .then(setAppVersion)
+      .then((version) => {
+        setAppVersion(version);
+        // Picked up by error reports, so a crash tells us which build it came
+        // from rather than leaving us guessing.
+        window.__APP_VERSION__ = version;
+      })
       .catch(() => {
         // Running in a browser rather than the desktop app.
       });
