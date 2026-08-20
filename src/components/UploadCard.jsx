@@ -414,8 +414,12 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
               emailTo,
               message,
               downloadUrl,
-              fileName: fileToUpload.name, // <--- ADD THIS HERE
-              requireReceipt, // <--- ADD THIS LINE
+              fileName: fileToUpload.name,
+              requireReceipt,
+              // So the email can state the real expiry and mention the
+              // password, rather than assuming seven days and staying silent.
+              expiryDays: expiry,
+              hasPassword: Boolean(linkPassword),
             })
           });
           // Recipients are remembered server-side by /send-email.
