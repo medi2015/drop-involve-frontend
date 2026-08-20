@@ -876,7 +876,8 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
 
               {linkPassword && (
                 <p className="text-xs text-sand/50 mb-4 text-center">
-                  Lenken er passordbeskyttet. Husk å dele passordet separat.
+                  Lenken er passordbeskyttet. Passordet blir ikke sendt til
+                  mottakeren &mdash; du må gi det videre selv.
                 </p>
               )}
 

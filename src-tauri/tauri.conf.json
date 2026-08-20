@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Drop Involve",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "identifier": "no.involve.drop",
   "build": {
     "frontendDist": "../dist",
