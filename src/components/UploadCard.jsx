@@ -116,7 +116,6 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const [message, setMessage] = useState('');
   const [expiry, setExpiry] = useState(7);
   const [linkPassword, setLinkPassword] = useState('');
-  const [passwordFocused, setPasswordFocused] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   // A ref rather than state: the token is issued and used inside one async
   // function, so it must be readable immediately, and nothing renders from it.
@@ -782,8 +781,6 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
                       placeholder="Passord på lenken (valgfritt)"
                       value={linkPassword}
                       onChange={(e) => setLinkPassword(e.target.value)}
-                      onFocus={() => setPasswordFocused(true)}
-                      onBlur={() => setPasswordFocused(false)}
                       minLength={6}
                       autoComplete="new-password"
                       aria-invalid={passwordBlocks}
@@ -791,20 +788,16 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
                     />
                   </div>
 
-                  {passwordIssue ? (
-                    <p className={`text-xs mt-2 ml-1 ${passwordIssue.level === 'error'
-                      ? 'text-rose-400'
-                      : passwordIssue.level === 'warn'
-                        ? 'text-brand/80'
-                        : 'text-sand/50'
-                      }`}>
-                      {passwordIssue.text}
-                    </p>
-                  ) : passwordFocused ? (
-                    <p className="text-xs text-sand/50 mt-2 ml-1">
-                      Minst 6 tegn, helst bokstaver og tall.
-                    </p>
-                  ) : null}
+                  {/* Always rendered. Showing and hiding it shifted everything
+                      below as you typed, which read as flickering. */}
+                  <p className={`text-xs mt-2 ml-1 ${passwordIssue?.level === 'error'
+                    ? 'text-rose-400'
+                    : passwordIssue?.level === 'warn'
+                      ? 'text-brand/80'
+                      : 'text-sand/50'
+                    }`}>
+                    {passwordIssue?.text || 'Minst 6 tegn, helst bokstaver og tall.'}
+                  </p>
                 </div>
 
                 <button
