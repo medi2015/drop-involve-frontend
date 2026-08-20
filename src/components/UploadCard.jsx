@@ -116,6 +116,7 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const [message, setMessage] = useState('');
   const [expiry, setExpiry] = useState(7);
   const [linkPassword, setLinkPassword] = useState('');
+  const [passwordFocused, setPasswordFocused] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   // A ref rather than state: the token is issued and used inside one async
   // function, so it must be readable immediately, and nothing renders from it.
@@ -159,6 +160,32 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
       })
       .slice(0, 8);
   })();
+
+  // Two levels on purpose. Too short is an error and blocks sending, because
+  // the server rejects it anyway. Weak-but-allowed is a warning: complexity
+  // rules mostly produce passwords written on sticky notes, so we advise
+  // rather than forbid.
+  const passwordIssue = (() => {
+    if (!linkPassword) return null;
+
+    if (linkPassword.length < 6) {
+      return { level: 'error', text: 'Minst 6 tegn.' };
+    }
+
+    const hasLetter = /\p{L}/u.test(linkPassword);
+    const hasNumber = /\d/.test(linkPassword);
+
+    if (!hasLetter || !hasNumber) {
+      return { level: 'warn', text: 'Svakt passord — bruk både bokstaver og tall.' };
+    }
+    if (linkPassword.length < 8) {
+      return { level: 'warn', text: 'Kort passord — 8 tegn eller mer er tryggere.' };
+    }
+
+    return { level: 'ok', text: 'Del passordet med mottakeren på en annen måte enn e-post.' };
+  })();
+
+  const passwordBlocks = passwordIssue?.level === 'error';
 
   const percent = progress.total > 0
     ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
@@ -368,7 +395,10 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
           })
         });
 
-        if (!res.ok) throw new Error('Failed to get upload URL');
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.error || 'Kunne ikke starte opplastingen.');
+        }
         const body = await res.json();
         objectKey = body.objectKey;
 
@@ -395,7 +425,13 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
           password: linkPassword || undefined,
         }),
       });
-      if (!downloadRes.ok) throw new Error('Failed to generate link');
+      if (!downloadRes.ok) {
+        // The server's message is the useful one — it says things like
+        // "Passordet må ha minst 6 tegn." Throwing a generic string here meant
+        // a correct validation error arrived and was silently discarded.
+        const detail = await downloadRes.json().catch(() => ({}));
+        throw new Error(detail.error || 'Kunne ikke lage nedlastingslenke.');
+      }
       const { downloadUrl } = await downloadRes.json();
 
       setDownloadUrl(downloadUrl);
@@ -746,24 +782,36 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
                       placeholder="Passord på lenken (valgfritt)"
                       value={linkPassword}
                       onChange={(e) => setLinkPassword(e.target.value)}
+                      onFocus={() => setPasswordFocused(true)}
+                      onBlur={() => setPasswordFocused(false)}
                       minLength={6}
                       autoComplete="new-password"
-                      className="w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand focus:outline-none"
+                      aria-invalid={passwordBlocks}
+                      className={`w-full field rounded-lg py-2.5 pl-11 pr-4 text-sand focus:outline-none ${passwordBlocks ? 'border-rose-400/60' : ''}`}
                     />
                   </div>
-                  {linkPassword && (
-                    <p className="text-xs text-sand/50 mt-2 ml-1">
-                      {linkPassword.length < 6
-                        ? 'Minst 6 tegn.'
-                        : 'Del passordet med mottakeren på en annen måte enn e-post.'}
+
+                  {passwordIssue ? (
+                    <p className={`text-xs mt-2 ml-1 ${passwordIssue.level === 'error'
+                      ? 'text-rose-400'
+                      : passwordIssue.level === 'warn'
+                        ? 'text-brand/80'
+                        : 'text-sand/50'
+                      }`}>
+                      {passwordIssue.text}
                     </p>
-                  )}
+                  ) : passwordFocused ? (
+                    <p className="text-xs text-sand/50 mt-2 ml-1">
+                      Minst 6 tegn, helst bokstaver og tall.
+                    </p>
+                  ) : null}
                 </div>
 
                 <button
                   onClick={startTransfer}
-                  disabled={!file}
-                  className={`w-full mt-1 px-6 py-3 font-medium text-base rounded-xl transition-colors active:scale-[0.99] flex items-center justify-center gap-2 ${file
+                  disabled={!file || passwordBlocks}
+                  title={passwordBlocks ? 'Passordet er for kort' : undefined}
+                  className={`w-full mt-1 px-6 py-3 font-medium text-base rounded-xl transition-colors active:scale-[0.99] flex items-center justify-center gap-2 ${file && !passwordBlocks
                     ? 'bg-brand text-ink-deep hover:bg-brand/90'
                     : 'bg-sand/5 text-sand/40 cursor-not-allowed'
                     }`}
