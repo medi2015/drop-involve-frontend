@@ -421,6 +421,11 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
           objectKey,
           expiresIn: expiresInSeconds,
           fileName: fileToUpload.name,
+          // Stored on the link so the landing page can show what the recipient
+          // is about to download. /s/:id is public and has no session to look
+          // any of this up from.
+          fileSize: fileToUpload.size,
+          message: transferMode === 'EMAIL' ? message : '',
           password: linkPassword || undefined,
         }),
       });
