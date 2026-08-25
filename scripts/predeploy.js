@@ -5,10 +5,16 @@
 // Pages serves every file in dist/ verbatim — which meant drop.involve.no was
 // serving /wrangler.json publicly, local Windows paths and all.
 //
-// Pages deploys are full snapshots, so removing the files here removes them
-// from the live site on the next deploy.
+// The plugin also writes .wrangler/deploy/config.json, a pointer telling
+// wrangler to read dist/wrangler.json instead of wrangler.jsonc. Removing the
+// target without removing the pointer makes every wrangler command fail with
+// "the redirected configuration path it points to does not exist", so both
+// have to go together.
+//
+// Pages deploys are full snapshots, so removing these files here also removes
+// them from the live site on the next deploy.
 import { rmSync } from 'node:fs';
 
-for (const file of ['dist/wrangler.json', 'dist/.assetsignore']) {
-  rmSync(file, { force: true });
-}
+rmSync('dist/wrangler.json', { force: true });
+rmSync('dist/.assetsignore', { force: true });
+rmSync('.wrangler/deploy', { force: true, recursive: true });
