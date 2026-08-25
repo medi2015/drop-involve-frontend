@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy",
+    "preview": "npm run build && vite preview",
+    "deploy": "npm run build && node scripts/predeploy.js && wrangler pages deploy dist --project-name=drop-involve-page --branch main",
     "tauri": "tauri"
   },
   "dependencies": {
