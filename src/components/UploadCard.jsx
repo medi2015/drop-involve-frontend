@@ -22,17 +22,61 @@ const formatWhen = (timestamp) =>
  * The previous fixed name told the recipient nothing — not what was inside,
  * nor which batch it was when several arrived the same day.
  */
-const zipNameFor = (files) => {
-  const base = files[0].name
-    .replace(/\.[^.]+$/, '')            // drop the extension
+const MAX_SIZE_BYTES = 20 * 1024 * 1024 * 1024; // 20 GB
+
+const sanitiseBase = (value) =>
+  String(value)
     .replace(/[^\p{L}\p{N} _-]/gu, '')  // keep letters, numbers, space, _ and -
     .trim()
     .replace(/\s+/g, '_')
     .slice(0, 40);
 
+const zipNameFor = (files) => {
+  const base = sanitiseBase(files[0].name.replace(/\.[^.]+$/, ''));
   const others = files.length - 1;
   const suffix = others === 1 ? 'og_1_til' : `og_${others}_flere`;
   return `${base || 'Filer'}_${suffix}.zip`;
+};
+
+/**
+ * Walks a dropped directory into a flat list of files, each carrying the path
+ * it had inside the folder so the zip can rebuild the structure.
+ *
+ * A dropped folder arrives in `dataTransfer.files` as a single zero-byte entry
+ * that isn't a real file. Uploading it failed at the PUT, which is what people
+ * were seeing. The directory contents are only reachable through the entries
+ * API, so that's what this uses.
+ */
+const readEntries = (reader) =>
+  new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+
+const walkEntry = async (entry, prefix, out) => {
+  if (entry.isFile) {
+    const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+    out.push({ file, path: `${prefix}${file.name}` });
+    return;
+  }
+
+  if (entry.isDirectory) {
+    const reader = entry.createReader();
+    // readEntries hands back at most 100 children per call and signals the end
+    // with an empty array, so a single call silently truncates large folders.
+    let batch;
+    do {
+      batch = await readEntries(reader);
+      for (const child of batch) {
+        await walkEntry(child, `${prefix}${entry.name}/`, out);
+      }
+    } while (batch.length > 0);
+  }
+};
+
+const collectDroppedEntries = async (entries) => {
+  const out = [];
+  for (const entry of entries) {
+    if (entry) await walkEntry(entry, '', out);
+  }
+  return out;
 };
 
 /**
@@ -138,6 +182,7 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const [progress, setProgress] = useState({ loaded: 0, total: 0, bytesPerSecond: 0 });
   const [zipProgress, setZipProgress] = useState(0);
   const xhrRef = useRef(null);
+  const folderInputRef = useRef(null);
   // Multipart runs several requests at once; cancelling has to abort them all.
   const activeUploadsRef = useRef(new Set());
 
@@ -288,8 +333,6 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const handleFileValidation = (selectedFile) => {
     if (!selectedFile) return;
 
-    const MAX_SIZE_BYTES = 20 * 1024 * 1024 * 1024; // 20 GB
-
     if (selectedFile.size > MAX_SIZE_BYTES) {
       setError('Filen er for stor. Maks grense er 20 GB.');
       setStatus('ERROR');
@@ -303,30 +346,56 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
     setFile(selectedFile);
   };
 
-  const processFiles = async (fileList) => {
-    if (!fileList || fileList.length === 0) return;
-    const files = Array.from(fileList);
-
-    // If it's just one file, process it normally
-    if (files.length === 1) {
-      handleFileValidation(files[0]);
+  /**
+   * Takes {file, path} pairs rather than a bare FileList, because a folder only
+   * makes sense with the paths kept — otherwise two files called the same thing
+   * in different subfolders overwrite each other in the zip.
+   */
+  const processEntries = async (items, { rootName } = {}) => {
+    if (!items || items.length === 0) {
+      setError('Fant ingen filer å laste opp. Mappen kan være tom.');
+      setStatus('ERROR');
       return;
     }
 
-    // If multiple files, bundle them into a zip
+    const hasFolders = items.some(({ path }) => path.includes('/'));
+
+    // A single loose file still uploads as itself — zipping it would only make
+    // the recipient unpack something for no reason.
+    if (items.length === 1 && !hasFolders) {
+      handleFileValidation(items[0].file);
+      return;
+    }
+
+    // Checked before zipping, not after: JSZip builds the archive in memory, so
+    // a folder well over the cap would exhaust the tab before we ever got a
+    // size to reject.
+    const totalBytes = items.reduce((sum, { file }) => sum + file.size, 0);
+    if (totalBytes > MAX_SIZE_BYTES) {
+      setError(`Innholdet er ${formatBytes(totalBytes)}. Maks grense er 20 GB.`);
+      setStatus('ERROR');
+      return;
+    }
+
     setStatus('ZIPPING'); // Shows a loading screen
     try {
       const zip = new JSZip();
-      files.forEach(file => {
-        zip.file(file.name, file);
+      items.forEach(({ file, path }) => {
+        zip.file(path, file);
       });
 
       setZipProgress(0);
       const zipContent = await zip.generateAsync({ type: 'blob' }, (metadata) =>
         setZipProgress(metadata.percent)
       );
+
+      // Named after the folder when there is one, so the recipient recognises it.
+      const name = rootName
+        ? `${sanitiseBase(rootName) || 'Mappe'}.zip`
+        : zipNameFor(items.map(({ file }) => file));
+
       // Convert the blob into a File object so the rest of your app knows how to handle it
-      const zipFile = new File([zipContent], zipNameFor(files), { type: 'application/zip' });
+      const zipFile = new File([zipContent], name, { type: 'application/zip' });
 
       handleFileValidation(zipFile);
     } catch {
@@ -342,11 +411,56 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    processFiles(e.dataTransfer.files);
+
+    // webkitGetAsEntry has to be called synchronously: the DataTransfer is
+    // emptied as soon as this handler returns, so anything read after an await
+    // comes back null.
+    const entries = Array.from(e.dataTransfer.items || [])
+      .filter((item) => item.kind === 'file')
+      .map((item) => (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null))
+      .filter(Boolean);
+
+    if (entries.length === 0) {
+      // Older browsers without the entries API. Folders still won't work there,
+      // but loose files carry on as before.
+      const items = Array.from(e.dataTransfer.files).map((file) => ({ file, path: file.name }));
+      processEntries(items);
+      return;
+    }
+
+    const rootName =
+      entries.length === 1 && entries[0].isDirectory ? entries[0].name : null;
+
+    // Only show the zipping screen when there's actually something to walk —
+    // a single dropped file resolves instantly and would just flash it.
+    if (entries.length > 1 || entries[0].isDirectory) {
+      setStatus('ZIPPING');
+      setZipProgress(0);
+    }
+
+    collectDroppedEntries(entries)
+      .then((items) => processEntries(items, { rootName }))
+      .catch(() => {
+        setError('Kunne ikke lese mappen. Prøv igjen.');
+        setStatus('ERROR');
+      });
   };
 
   const handleFileSelect = (e) => {
-    processFiles(e.target.files);
+    // A folder picked through the dialog arrives already flattened, with the
+    // structure in webkitRelativePath.
+    const files = Array.from(e.target.files || []);
+    const items = files.map((file) => ({
+      file,
+      path: file.webkitRelativePath || file.name,
+    }));
+    const rootName = files[0]?.webkitRelativePath
+      ? files[0].webkitRelativePath.split('/')[0]
+      : null;
+
+    processEntries(items, { rootName });
+    // Lets the same folder be picked twice in a row.
+    e.target.value = '';
   };
 
   const startTransfer = async () => {
@@ -664,12 +778,31 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
                       <Upload size={22} />
                     )}
                   </div>
-                  <h3 className="text-base font-medium text-sand mb-1">{file ? 'Fil valgt' : 'Slipp filene her'}</h3>
+                  <h3 className="text-base font-medium text-sand mb-1">{file ? 'Fil valgt' : 'Slipp filer eller mapper her'}</h3>
                   <p className="text-sand/50 text-xs text-center max-w-[220px] truncate">
                     {file ? file.name : 'eller klikk for å bla gjennom'}
                   </p>
                   <input type="file" multiple className="hidden" onChange={handleFileSelect} />
                 </label>
+
+                {/* Outside the label on purpose: a button nested inside one
+                    triggers that label's file input instead of its own. */}
+                <button
+                  type="button"
+                  onClick={() => folderInputRef.current?.click()}
+                  className="text-sand/60 hover:text-sand text-xs underline underline-offset-2 transition-colors"
+                >
+                  Velg en mappe i stedet
+                </button>
+                <input
+                  ref={folderInputRef}
+                  type="file"
+                  multiple
+                  webkitdirectory=""
+                  directory=""
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
               </div>
 
               {/* Form Side */}
