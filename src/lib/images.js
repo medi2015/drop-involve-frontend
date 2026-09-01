@@ -28,20 +28,32 @@ const bestType = () => {
     : 'image/jpeg';
 };
 
+/**
+ * The object URL is deliberately *not* revoked once the image has decoded.
+ *
+ * The crop preview renders the same element's src, so revoking on load leaves
+ * an empty frame — the image is in memory and drawable, but the browser has
+ * nothing to display. The caller revokes it with releaseImage when the crop is
+ * finished or abandoned.
+ */
 export const loadImage = (file) =>
   new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(image);
-    };
+
+    image.onload = () => resolve(image);
     image.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error('Kunne ikke lese bildet.'));
     };
+
     image.src = url;
   });
+
+/** Frees the memory the browser is holding for a chosen file. */
+export const releaseImage = (image) => {
+  if (image?.src?.startsWith('blob:')) URL.revokeObjectURL(image.src);
+};
 
 /**
  * The scale at which the image just covers the frame. Everything else is

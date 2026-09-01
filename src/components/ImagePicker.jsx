@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Trash2, Crop as CropIcon, Loader2 } from 'lucide-react';
 import { API_BASE } from '../lib/api';
 import {
-  PRESETS, loadImage, coverScale, clampOffset, cropToFile, formatKb,
+  PRESETS, loadImage, releaseImage, coverScale, clampOffset, cropToFile, formatKb,
 } from '../lib/images';
 
 /**
@@ -99,6 +99,11 @@ const ImagePicker = ({ preset, value, onChange, session }) => {
 
   const onPointerUp = () => { dragging.current = null; };
 
+  const discard = () => {
+    releaseImage(image);
+    setImage(null);
+  };
+
   const upload = async () => {
     setBusy(true);
     setError('');
@@ -122,7 +127,7 @@ const ImagePicker = ({ preset, value, onChange, session }) => {
 
       setSize(blob.size);
       onChange(data.url);
-      setImage(null);
+      discard();
     } catch (uploadError) {
       setError(uploadError.message);
     } finally {
@@ -227,7 +232,7 @@ const ImagePicker = ({ preset, value, onChange, session }) => {
             </button>
             <button
               type="button"
-              onClick={() => setImage(null)}
+              onClick={discard}
               className="bg-sand/10 text-sand rounded-lg px-4 py-2.5 text-sm"
             >
               Avbryt
