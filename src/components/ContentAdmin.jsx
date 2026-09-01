@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   X, Plus, Pencil, Trash2, ExternalLink, Loader2, ArrowLeft, RotateCcw,
@@ -84,6 +84,14 @@ const ContentAdmin = ({ session, onClose }) => {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
+  // Crops that have been positioned but not uploaded. Pressing Lagre with one
+  // outstanding used to discard it silently — the slide saved with no image
+  // and nothing said why. Now Lagre finishes them first.
+  const pending = useRef({});
+  const registerPending = useCallback((fieldName, run) => {
+    pending.current[fieldName] = run;
+  }, []);
+
   const authHeaders = useCallback(
     () => ({ Authorization: `Bearer ${session.token}` }),
     [session.token]
@@ -108,11 +116,22 @@ const ContentAdmin = ({ session, onClose }) => {
   }, [authHeaders]);
 
   /** One write for the whole list — see the note on PUT /admin/slides. */
-  const persist = async (next) => {
+  const persist = async (nextSlides) => {
     setSaving(true);
     setError('');
 
     try {
+      // Finish any crop still sitting in an editor, and fold the resulting URLs
+      // in directly rather than waiting for React state to catch up.
+      let next = nextSlides;
+      const outstanding = Object.entries(pending.current).filter(([, run]) => run);
+
+      for (const [fieldName, run] of outstanding) {
+        const url = await run();
+        next = next.map((slide, i) => (i === editing ? { ...slide, [fieldName]: url } : slide));
+      }
+      pending.current = {};
+
       const response = await fetch(`${API_BASE}/admin/slides`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -327,7 +346,7 @@ const ContentAdmin = ({ session, onClose }) => {
     >
       <div className="flex items-center justify-between mb-5">
         <button
-          onClick={() => setEditing(null)}
+          onClick={() => { pending.current = {}; setEditing(null); }}
           className="text-sand/60 hover:text-brand text-sm flex items-center gap-2 transition-colors"
         >
           <ArrowLeft size={15} /> Tilbake til oversikten
@@ -436,15 +455,19 @@ const ContentAdmin = ({ session, onClose }) => {
       <div className="border-t border-sand/10 pt-5 mt-2 space-y-5">
         <ImagePicker
           preset="background"
+          field="backgroundUrl"
           value={slide.backgroundUrl}
           onChange={(url) => set({ backgroundUrl: url })}
+          registerPending={registerPending}
           session={session}
         />
         {!isTagline && (
           <ImagePicker
             preset="thumb"
+            field="thumbUrl"
             value={slide.thumbUrl}
             onChange={(url) => set({ thumbUrl: url })}
+            registerPending={registerPending}
             session={session}
           />
         )}
@@ -519,7 +542,7 @@ const ContentAdmin = ({ session, onClose }) => {
         </button>
 
         <button
-          onClick={() => setEditing(null)}
+          onClick={() => { pending.current = {}; setEditing(null); }}
           className="bg-sand/10 text-sand rounded-lg px-4 py-2.5 text-sm"
         >
           Avbryt

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Trash2, Crop as CropIcon, Loader2 } from 'lucide-react';
 import { API_BASE } from '../lib/api';
 import {
@@ -15,7 +15,7 @@ import {
  */
 const FRAME_WIDTH = 440;
 
-const ImagePicker = ({ preset, value, onChange, session }) => {
+const ImagePicker = ({ preset, field, value, onChange, session, registerPending }) => {
   const { aspect, label } = PRESETS[preset];
   const frameHeight = Math.round(FRAME_WIDTH / aspect);
 
@@ -89,21 +89,27 @@ const ImagePicker = ({ preset, value, onChange, session }) => {
 
   const onPointerMove = useCallback((event) => {
     if (!dragging.current || !image) return;
+    const height = Math.round(FRAME_WIDTH / aspect);
     setOffset(
       clampOffset(
         { x: event.clientX - dragging.current.x, y: event.clientY - dragging.current.y },
-        image, FRAME_WIDTH, frameHeight, zoom
+        image, FRAME_WIDTH, height, zoom
       )
     );
-  }, [image, zoom, frameHeight]);
+  }, [image, zoom, aspect]);
 
   const onPointerUp = () => { dragging.current = null; };
 
   const discard = () => {
     releaseImage(image);
     setImage(null);
+    registerPending?.(field, null);
   };
 
+  /**
+   * Returns the uploaded URL as well as reporting it, so the editor can save
+   * a slide in the same pass without waiting for React state to settle.
+   */
   const upload = async () => {
     setBusy(true);
     setError('');
@@ -128,12 +134,23 @@ const ImagePicker = ({ preset, value, onChange, session }) => {
       setSize(blob.size);
       onChange(data.url);
       discard();
+      return data.url;
     } catch (uploadError) {
       setError(uploadError.message);
+      throw uploadError;
     } finally {
       setBusy(false);
     }
   };
+
+  // Tells the editor there's a crop waiting, so pressing Lagre finishes it
+  // rather than silently throwing it away. Re-registered every render so the
+  // function it holds always closes over the current crop position.
+  useEffect(() => {
+    if (!image) return undefined;
+    registerPending?.(field, upload);
+    return () => registerPending?.(field, null);
+  });
 
   return (
     <div>
@@ -220,15 +237,20 @@ const ImagePicker = ({ preset, value, onChange, session }) => {
 
           <p className="text-sand/45 text-xs mt-1">Dra bildet for å velge utsnittet.</p>
 
+          <p className="text-brand/90 text-xs mt-2">
+            Bildet er ikke lastet opp ennå. Trykk «Last opp bildet» — eller bare
+            Lagre, så gjøres det for deg.
+          </p>
+
           <div className="flex gap-2 mt-3">
             <button
               type="button"
-              onClick={upload}
+              onClick={() => upload().catch(() => {})}
               disabled={busy}
               className="bg-brand text-ink-deep rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-60 flex items-center gap-2"
             >
               {busy && <Loader2 size={15} className="animate-spin" />}
-              {busy ? 'Laster opp…' : 'Bruk utsnittet'}
+              {busy ? 'Laster opp…' : 'Last opp bildet'}
             </button>
             <button
               type="button"
