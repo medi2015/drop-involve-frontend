@@ -69,20 +69,23 @@ const Switch = ({ on, onChange, label = 'Vises for mottakere' }) => (
     aria-label={label}
     title={on ? 'Vises for mottakere — klikk for å slå av' : 'Skjult — klikk for å slå på'}
     onClick={onChange}
-    className="shrink-0 flex items-center gap-2.5 group"
+    className="shrink-0 flex items-center gap-2.5 group opacity-100"
   >
     <span
       className={`relative w-[46px] h-6 rounded-full transition-colors duration-150 ${
-        on ? 'bg-brand' : 'bg-ink-deep group-hover:bg-ink-deep/80'
+        on ? 'bg-brand' : 'bg-ink-deep'
       }`}
     >
+      {/* Off is the exact inverse of on — yellow knob on black rather than a
+          grey wash, so both states read as deliberate rather than one looking
+          like a disabled control. */}
       <span
         className={`absolute top-[3px] w-[18px] h-[18px] rounded-full transition-all duration-150 ${
-          on ? 'left-[25px] bg-ink-deep' : 'left-[3px] bg-sand/45'
+          on ? 'left-[25px] bg-ink-deep' : 'left-[3px] bg-brand'
         }`}
       />
     </span>
-    <span className={`text-xs w-5 text-left ${on ? 'text-brand' : 'text-sand/50'}`}>
+    <span className={`text-xs w-5 text-left ${on ? 'text-brand' : 'text-sand/70'}`}>
       {on ? 'På' : 'Av'}
     </span>
   </button>
@@ -290,10 +293,17 @@ const ContentAdmin = ({ session, onClose }) => {
               {slides.map((slide, index) => (
                 <div
                   key={slide.id || index}
-                  className={`surface-inset rounded-xl p-3 flex items-center gap-3 ${
-                    slide.enabled === false ? 'opacity-45' : ''
-                  }`}
+                  className="surface-inset rounded-xl p-3 flex items-center gap-3"
                 >
+                  {/* Dimming is applied to the content rather than the whole
+                      row, so the switch and the buttons stay at full strength.
+                      Fading the control too made "off" look disabled — as
+                      though the row couldn't be switched back on. */}
+                  <div
+                    className={`flex items-center gap-3 flex-1 min-w-0 ${
+                      slide.enabled === false ? 'opacity-45' : ''
+                    }`}
+                  >
                   {/* Shows the background photo with the card image inset on
                       top, so the row says at a glance which of the two are set.
                       Previously only the card image appeared, and a slide with
@@ -338,6 +348,7 @@ const ContentAdmin = ({ session, onClose }) => {
                     <p className="text-sand/50 text-xs truncate mt-0.5">
                       {slide.body || slide.tagline || 'Ingen tekst'}
                     </p>
+                  </div>
                   </div>
 
                   <Switch
