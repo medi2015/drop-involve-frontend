@@ -73,12 +73,12 @@ const Switch = ({ on, onChange, label = 'Vises for mottakere' }) => (
   >
     <span
       className={`relative w-[46px] h-6 rounded-full transition-colors duration-150 ${
-        on ? 'bg-brand' : 'bg-sand/15 group-hover:bg-sand/25'
+        on ? 'bg-brand' : 'bg-ink-deep group-hover:bg-ink-deep/80'
       }`}
     >
       <span
         className={`absolute top-[3px] w-[18px] h-[18px] rounded-full transition-all duration-150 ${
-          on ? 'left-[25px] bg-ink-deep' : 'left-[3px] bg-sand/70'
+          on ? 'left-[25px] bg-ink-deep' : 'left-[3px] bg-sand/45'
         }`}
       />
     </span>
