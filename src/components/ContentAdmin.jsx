@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
-  X, Plus, Pencil, Trash2, ExternalLink, Loader2, ArrowLeft, RotateCcw,
+  X, Plus, Pencil, Trash2, ExternalLink, Loader2, ArrowLeft, RotateCcw, ImageOff,
 } from 'lucide-react';
 import { API_BASE } from '../lib/api';
 import ImagePicker from './ImagePicker';
@@ -240,13 +240,39 @@ const ContentAdmin = ({ session, onClose }) => {
                     slide.enabled === false ? 'opacity-45' : ''
                   }`}
                 >
+                  {/* Shows the background photo with the card image inset on
+                      top, so the row says at a glance which of the two are set.
+                      Previously only the card image appeared, and a slide with
+                      a background but no card image looked entirely empty. */}
                   <div
-                    className="w-16 h-16 rounded-lg shrink-0 bg-cover bg-center"
-                    style={{
-                      backgroundImage: slide.thumbUrl ? `url(${slide.thumbUrl})` : undefined,
-                      background: slide.thumbUrl ? undefined : slide.pageColor || DEFAULTS.pageColor,
-                    }}
-                  />
+                    className="w-16 h-16 rounded-lg shrink-0 relative overflow-hidden border border-sand/10"
+                    style={{ background: slide.pageColor || DEFAULTS.pageColor }}
+                  >
+                    {slide.backgroundUrl && (
+                      <img
+                        src={slide.backgroundUrl}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+
+                    {slide.thumbUrl && (
+                      <img
+                        src={slide.thumbUrl}
+                        alt=""
+                        className="absolute right-1 bottom-1 w-6 h-6 rounded object-cover border border-sand/40"
+                      />
+                    )}
+
+                    {!slide.backgroundUrl && !slide.thumbUrl && (
+                      <span
+                        title="Ingen bilder lagt inn"
+                        className="absolute inset-0 flex items-center justify-center text-sand/35"
+                      >
+                        <ImageOff size={16} />
+                      </span>
+                    )}
+                  </div>
 
                   <div className="flex-1 min-w-0">
                     {slide.kicker && (
