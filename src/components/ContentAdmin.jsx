@@ -83,6 +83,10 @@ const ContentAdmin = ({ session, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  // Fingerprint of the list as loaded. Sent back on save so the server can
+  // refuse a write built on a copy someone else has since changed.
+  const [revision, setRevision] = useState(null);
+  const [conflict, setConflict] = useState(false);
 
   // Crops that have been positioned but not uploaded. Pressing Lagre with one
   // outstanding used to discard it silently — the slide saved with no image
@@ -108,6 +112,7 @@ const ContentAdmin = ({ session, onClose }) => {
       .then((data) => {
         if (cancelled) return;
         setSlides(Array.isArray(data.slides) ? data.slides : []);
+        setRevision(data.revision || null);
         setState('ready');
       })
       .catch(() => !cancelled && setState('error'));
@@ -119,6 +124,7 @@ const ContentAdmin = ({ session, onClose }) => {
   const persist = async (nextSlides) => {
     setSaving(true);
     setError('');
+    setConflict(false);
 
     try {
       // Finish any crop still sitting in an editor, and fold the resulting URLs
@@ -135,13 +141,23 @@ const ContentAdmin = ({ session, onClose }) => {
       const response = await fetch(`${API_BASE}/admin/slides`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ slides: next }),
+        body: JSON.stringify({ slides: next, revision }),
       });
 
       const data = await response.json().catch(() => ({}));
+
+      if (response.status === 409) {
+        // Someone else saved while this copy was open. Refuse rather than
+        // overwrite, and offer the only safe way out.
+        setConflict(true);
+        setError(data.error || 'Innholdet er endret av noen andre.');
+        return false;
+      }
+
       if (!response.ok) throw new Error(data.error || 'Kunne ikke lagre.');
 
       setSlides(data.slides);
+      setRevision(data.revision || null);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       return true;
@@ -318,8 +334,23 @@ const ContentAdmin = ({ session, onClose }) => {
           </>
         )}
 
-        {error && <p className="text-rose-300 text-sm mt-4">{error}</p>}
+        {error && !conflict && <p className="text-rose-300 text-sm mt-4">{error}</p>}
         {saved && <p className="text-mint text-sm mt-4">Lagret</p>}
+      {conflict && (
+          <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 p-3.5">
+            <p className="text-amber-100 text-sm">
+              Noen andre har endret innholdet mens du redigerte. Endringene dine er
+              ikke lagret.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 bg-sand/10 text-sand rounded-lg px-3.5 py-2 text-sm"
+            >
+              Last inn på nytt
+            </button>
+          </div>
+        )}
+
 
         {confirmDelete !== null && (
           <div className="fixed inset-0 bg-ink-deep/75 flex items-center justify-center p-5 z-50">
@@ -593,8 +624,23 @@ const ContentAdmin = ({ session, onClose }) => {
         </button>
       </div>
 
-      {error && <p className="text-rose-300 text-sm mt-4">{error}</p>}
+      {error && !conflict && <p className="text-rose-300 text-sm mt-4">{error}</p>}
       {saved && <p className="text-mint text-sm mt-4">Lagret</p>}
+      {conflict && (
+        <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 p-3.5">
+          <p className="text-amber-100 text-sm">
+            Noen andre har endret innholdet mens du redigerte. Endringene dine er
+            ikke lagret.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 bg-sand/10 text-sand rounded-lg px-3.5 py-2 text-sm"
+          >
+            Last inn på nytt
+          </button>
+        </div>
+      )}
+
 
       {confirmDelete !== null && (
         <div className="fixed inset-0 bg-ink-deep/75 flex items-center justify-center p-5 z-50">
