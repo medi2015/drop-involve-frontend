@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Globe, History } from 'lucide-react';
+import { Globe, History, LayoutGrid } from 'lucide-react';
 import UploadCard from './components/UploadCard';
+import ContentAdmin from './components/ContentAdmin';
 import LoginScreen from './components/LoginScreen';
 import { loadSession, saveSession, clearSession } from './lib/auth';
 import { API_BASE } from './lib/api';
@@ -17,6 +18,9 @@ const App = () => {
   // flash on load.
   const [session, setSession] = useState(() => loadSession());
   const [showHistory, setShowHistory] = useState(false);
+  // The landing-page editor. Behind the same Google sign-in as everything
+  // else, so there's no second login to manage.
+  const [showContent, setShowContent] = useState(false);
   // Only meaningful in the desktop app — the website is always whatever was
   // last deployed, so a version number there would just be noise.
   const [appVersion, setAppVersion] = useState('');
@@ -136,6 +140,19 @@ const App = () => {
               <History size={15} /> Historikk
             </button>
 
+            {/* Same weight as Historikk rather than a tab: only a couple of
+                people edit the landing page, and the rest shouldn't have to
+                wonder what it is. Hidden below md for the same reason "Alle
+                enheter" is — nobody crops a background image on a phone. */}
+            <button
+              onClick={() => setShowContent((open) => !open)}
+              className={`hidden md:flex items-center gap-2 transition-colors shrink-0 ${
+                showContent ? 'text-brand' : 'text-sand/60 hover:text-brand'
+              }`}
+            >
+              <LayoutGrid size={15} /> Innhold
+            </button>
+
             {session?.user && (
               <>
                 <span className="text-sand/70 truncate hidden sm:inline">
@@ -159,11 +176,15 @@ const App = () => {
           </div>
         </motion.header>
 
-        <UploadCard
-          session={session}
-          showHistory={showHistory}
-          setShowHistory={setShowHistory}
-        />
+        {showContent ? (
+          <ContentAdmin session={session} onClose={() => setShowContent(false)} />
+        ) : (
+          <UploadCard
+            session={session}
+            showHistory={showHistory}
+            setShowHistory={setShowHistory}
+          />
+        )}
 
         <motion.footer
           initial={{ opacity: 0 }}
