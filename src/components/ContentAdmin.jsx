@@ -50,6 +50,44 @@ const Field = ({ label, hint, children }) => (
 
 const inputClass = 'field w-full rounded-lg px-3 py-2.5 text-sand text-sm';
 
+/**
+ * On/off switch.
+ *
+ * Replaces a small "På"/"Av" pill that read as a status label rather than a
+ * control — people couldn't tell it was clickable, or that the state could be
+ * changed at all. A knob that physically moves, plus brand yellow for on and a
+ * flat dark track for off, says both things without needing a caption.
+ *
+ * role="switch" with aria-checked so it's announced correctly rather than as an
+ * unlabelled button.
+ */
+const Switch = ({ on, onChange, label = 'Vises for mottakere' }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={on}
+    aria-label={label}
+    title={on ? 'Vises for mottakere — klikk for å slå av' : 'Skjult — klikk for å slå på'}
+    onClick={onChange}
+    className="shrink-0 flex items-center gap-2.5 group"
+  >
+    <span
+      className={`relative w-[46px] h-6 rounded-full transition-colors duration-150 ${
+        on ? 'bg-brand' : 'bg-sand/15 group-hover:bg-sand/25'
+      }`}
+    >
+      <span
+        className={`absolute top-[3px] w-[18px] h-[18px] rounded-full transition-all duration-150 ${
+          on ? 'left-[25px] bg-ink-deep' : 'left-[3px] bg-sand/70'
+        }`}
+      />
+    </span>
+    <span className={`text-xs w-5 text-left ${on ? 'text-brand' : 'text-sand/50'}`}>
+      {on ? 'På' : 'Av'}
+    </span>
+  </button>
+);
+
 const Colour = ({ label, value, fallback, onChange }) => (
   <div className="flex items-center gap-3 mb-2.5">
     <span
@@ -302,16 +340,10 @@ const ContentAdmin = ({ session, onClose }) => {
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => toggle(index)}
-                    className={`text-xs px-2.5 py-1.5 rounded-md shrink-0 transition-colors ${
-                      slide.enabled === false
-                        ? 'bg-sand/10 text-sand/60'
-                        : 'bg-mint/20 text-mint'
-                    }`}
-                  >
-                    {slide.enabled === false ? 'Av' : 'På'}
-                  </button>
+                  <Switch
+                    on={slide.enabled !== false}
+                    onChange={() => toggle(index)}
+                  />
 
                   <button
                     onClick={() => setEditing(index)}
@@ -409,12 +441,10 @@ const ContentAdmin = ({ session, onClose }) => {
           <ArrowLeft size={15} /> Tilbake til oversikten
         </button>
 
-        <label className="flex items-center gap-2 text-sm text-sand/70 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={slide.enabled !== false}
-            onChange={(event) => set({ enabled: event.target.checked })}
-            className="accent-brand w-4 h-4"
+        <label className="flex items-center gap-3 text-sm text-sand/70">
+          <Switch
+            on={slide.enabled !== false}
+            onChange={() => set({ enabled: slide.enabled === false })}
           />
           Vises for mottakere
         </label>
