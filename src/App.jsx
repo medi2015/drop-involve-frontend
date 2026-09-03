@@ -25,6 +25,29 @@ const App = () => {
   // last deployed, so a version number there would just be noise.
   const [appVersion, setAppVersion] = useState('');
 
+  /**
+   * Back to the send screen.
+   *
+   * History and the content editor used to be independent flags, so opening one
+   * on top of the other left both set — closing the editor dropped you into
+   * history rather than the send screen, with no way out but closing that too.
+   * Everything that changes view now goes through one of these.
+   */
+  const showSend = () => {
+    setShowHistory(false);
+    setShowContent(false);
+  };
+
+  const openHistory = () => {
+    setShowContent(false);
+    setShowHistory((open) => !open);
+  };
+
+  const openContent = () => {
+    setShowHistory(false);
+    setShowContent((open) => !open);
+  };
+
   const handleSignedIn = (payload) => setSession(saveSession(payload));
 
   const handleSignOut = () => {
@@ -122,20 +145,29 @@ const App = () => {
           animate={{ opacity: 1, y: 0 }}
           className="w-full flex items-center gap-3 mb-5"
         >
-          <span
-            aria-hidden="true"
-            className="w-8 h-8 rounded-md bg-brand text-ink-deep flex items-center justify-center text-lg font-bold leading-none shrink-0"
+          <button
+            onClick={showSend}
+            title="Til forsiden"
+            aria-label="Til forsiden"
+            className="flex items-center gap-3 group shrink-0"
           >
-            I
-          </span>
-          <h1 className="text-base font-bold tracking-wide text-sand leading-none">
-            drop.involve.no
-          </h1>
+            <span
+              aria-hidden="true"
+              className="w-8 h-8 rounded-md bg-brand text-ink-deep flex items-center justify-center text-lg font-bold leading-none shrink-0"
+            >
+              I
+            </span>
+            <h1 className="text-base font-bold tracking-wide text-sand leading-none group-hover:text-brand transition-colors">
+              drop.involve.no
+            </h1>
+          </button>
 
           <div className="ml-auto flex items-center gap-4 text-sm min-w-0">
             <button
-              onClick={() => setShowHistory(true)}
-              className="flex items-center gap-2 text-sand/60 hover:text-brand transition-colors shrink-0"
+              onClick={openHistory}
+              className={`flex items-center gap-2 transition-colors shrink-0 ${
+                showHistory ? 'text-brand' : 'text-sand/60 hover:text-brand'
+              }`}
             >
               <History size={15} /> Historikk
             </button>
@@ -145,7 +177,7 @@ const App = () => {
                 wonder what it is. Hidden below md for the same reason "Alle
                 enheter" is — nobody crops a background image on a phone. */}
             <button
-              onClick={() => setShowContent((open) => !open)}
+              onClick={openContent}
               className={`hidden md:flex items-center gap-2 transition-colors shrink-0 ${
                 showContent ? 'text-brand' : 'text-sand/60 hover:text-brand'
               }`}
@@ -177,7 +209,7 @@ const App = () => {
         </motion.header>
 
         {showContent ? (
-          <ContentAdmin session={session} onClose={() => setShowContent(false)} />
+          <ContentAdmin session={session} onClose={showSend} />
         ) : (
           <UploadCard
             session={session}
