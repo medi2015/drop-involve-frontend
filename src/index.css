@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  /* Involve uses Arial/Helvetica across its internal sites and templates. */
-  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Inter, as on hub.involve.no. Helvetica Neue isn't installed on Windows, so
+     it was silently falling back to Arial — noticeably tighter and harder to
+     read at the small sizes this interface uses. */
+  --font-sans: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
 
   /* Involve brand palette — these are the only colours the app should use. */
   --color-ink: #003F46;        /* Mørk grønn — primary */
@@ -25,6 +27,9 @@ body {
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
+  /* Set explicitly rather than relying on Tailwind's preflight, so the desktop
+     app can't end up on a different face from the website. */
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
