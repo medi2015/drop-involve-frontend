@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { API_BASE } from '../lib/api';
 import { uploadInParts, MULTIPART_THRESHOLD } from '../lib/multipart';
+import { reportError } from '../lib/reportError';
 
 const formatWhen = (timestamp) =>
   new Date(timestamp).toLocaleString('no-NO', {
@@ -398,8 +399,24 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
       const zipFile = new File([zipContent], name, { type: 'application/zip' });
 
       handleFileValidation(zipFile);
-    } catch {
-      setError('Kunne ikke komprimere filene. Prøv igjen.');
+    } catch (zipError) {
+      // The real cause used to be discarded, leaving "prøv igjen" as advice for
+      // something retrying will never fix. JSZip builds the whole archive in
+      // memory before anything uploads, so a large batch runs the tab out of
+      // room — a different problem, needing different advice.
+      console.error('[zip] failed:', zipError);
+      reportError(zipError, `zip:${items.length} files, ${formatBytes(totalBytes)}`);
+
+      const outOfMemory = /allocat|memory|heap|size|RangeError/i.test(
+        `${zipError?.name || ''} ${zipError?.message || ''}`
+      );
+
+      setError(
+        outOfMemory
+          ? `Klarte ikke å pakke ${items.length} filer (${formatBytes(totalBytes)}) — ` +
+            'det ble for mye på én gang. Prøv å sende færre filer per overføring.'
+          : 'Kunne ikke komprimere filene. Prøv igjen.'
+      );
       setStatus('ERROR');
     }
   }; const handleCopyLink = (url, id) => {
