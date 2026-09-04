@@ -1,5 +1,4 @@
 
-import JSZip from 'jszip'; // <--- ADD THIS
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -9,6 +8,7 @@ import {
 } from 'lucide-react';
 import { API_BASE } from '../lib/api';
 import { uploadInParts, MULTIPART_THRESHOLD } from '../lib/multipart';
+import { uploadZipInParts } from '../lib/zipUpload';
 import { reportError } from '../lib/reportError';
 
 const formatWhen = (timestamp) =>
@@ -147,6 +147,9 @@ const putWithProgress = (url, file, { headers, onProgress, xhrRef }) =>
  */
 const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const [file, setFile] = useState(null);
+  // A multi-file or folder selection, zipped during upload rather than on
+  // drop: { items: [{file, path}], name, size }.
+  const [batch, setBatch] = useState(null);
   const [status, setStatus] = useState('IDLE'); // IDLE, UPLOADING, SUCCESS, ERROR
   const [transferMode, setTransferMode] = useState('EMAIL'); // EMAIL, LINK
   const [downloadUrl, setDownloadUrl] = useState('');
@@ -181,7 +184,6 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   const [copiedId, setCopiedId] = useState(null);
   // Real transfer progress, replacing the bar that always animated to 70%.
   const [progress, setProgress] = useState({ loaded: 0, total: 0, bytesPerSecond: 0 });
-  const [zipProgress, setZipProgress] = useState(0);
   const xhrRef = useRef(null);
   const folderInputRef = useRef(null);
   // Multipart runs several requests at once; cancelling has to abort them all.
@@ -231,6 +233,8 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
   })();
 
   const passwordBlocks = passwordIssue?.level === 'error';
+  // Either a single file or a batch waiting to be zipped on send.
+  const selection = file || batch;
 
   const percent = progress.total > 0
     ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
@@ -344,6 +348,7 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
     // If it passes, clear any errors and set the file
     setError('');
     setStatus('IDLE');
+    setBatch(null);
     setFile(selectedFile);
   };
 
@@ -368,9 +373,8 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
       return;
     }
 
-    // Checked before zipping, not after: JSZip builds the archive in memory, so
-    // a folder well over the cap would exhaust the tab before we ever got a
-    // size to reject.
+    // Checked before anything else: there is no point letting someone wait
+    // through an upload we will refuse at the end.
     const totalBytes = items.reduce((sum, { file }) => sum + file.size, 0);
     if (totalBytes > MAX_SIZE_BYTES) {
       setError(`Innholdet er ${formatBytes(totalBytes)}. Maks grense er 20 GB.`);
@@ -378,47 +382,25 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
       return;
     }
 
-    setStatus('ZIPPING'); // Shows a loading screen
-    try {
-      const zip = new JSZip();
-      items.forEach(({ file, path }) => {
-        zip.file(path, file);
-      });
-
-      setZipProgress(0);
-      const zipContent = await zip.generateAsync({ type: 'blob' }, (metadata) =>
-        setZipProgress(metadata.percent)
-      );
-
-      // Named after the folder when there is one, so the recipient recognises it.
-      const name = rootName
+    // Nothing is zipped here any more.
+    //
+    // Building the archive on drop meant holding all of it in memory, and V8
+    // refuses any single allocation over ~2.1 GB — so 96 photos totalling
+    // 2.1 GB failed with "Array buffer allocation failed", after several
+    // minutes of work. Zipping now happens during the upload, a part at a
+    // time, so the size of the batch no longer matters.
+    //
+    // The selection is just recorded. Dropping files is instant.
+    setError('');
+    setStatus('IDLE');
+    setFile(null);
+    setBatch({
+      items,
+      name: rootName
         ? `${sanitiseBase(rootName) || 'Mappe'}.zip`
-        : zipNameFor(items.map(({ file }) => file));
-
-      // Convert the blob into a File object so the rest of your app knows how to handle it
-      const zipFile = new File([zipContent], name, { type: 'application/zip' });
-
-      handleFileValidation(zipFile);
-    } catch (zipError) {
-      // The real cause used to be discarded, leaving "prøv igjen" as advice for
-      // something retrying will never fix. JSZip builds the whole archive in
-      // memory before anything uploads, so a large batch runs the tab out of
-      // room — a different problem, needing different advice.
-      console.error('[zip] failed:', zipError);
-      reportError(zipError, `zip:${items.length} files, ${formatBytes(totalBytes)}`);
-
-      const outOfMemory = /allocat|memory|heap|size|RangeError/i.test(
-        `${zipError?.name || ''} ${zipError?.message || ''}`
-      );
-
-      setError(
-        outOfMemory
-          ? `Klarte ikke å pakke ${items.length} filer (${formatBytes(totalBytes)}) — ` +
-            'det ble for mye på én gang. Prøv å sende færre filer per overføring.'
-          : 'Kunne ikke komprimere filene. Prøv igjen.'
-      );
-      setStatus('ERROR');
-    }
+        : zipNameFor(items.map(({ file }) => file)),
+      size: totalBytes,
+    });
   }; const handleCopyLink = (url, id) => {
     navigator.clipboard.writeText(url);
     setCopiedId(id);
@@ -452,7 +434,6 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
     // a single dropped file resolves instantly and would just flash it.
     if (entries.length > 1 || entries[0].isDirectory) {
       setStatus('ZIPPING');
-      setZipProgress(0);
     }
 
     collectDroppedEntries(entries)
@@ -480,9 +461,129 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
     e.target.value = '';
   };
 
-  const startTransfer = async () => {
-    if (!file) return;
-    uploadFile(file);
+  /**
+   * Everything after the bytes are safely in R2: make the link, show it, record
+   * it, send the email. Identical for a single file and for a zipped batch, so
+   * it lives in one place rather than being duplicated and drifting.
+   *
+   * `uploaded` only needs a name and a size — for a batch that's the archive's,
+   * which isn't known until the upload finishes.
+   */
+  const finishTransfer = async (objectKey, uploaded) => {
+    const expiresInSeconds = expiry * 24 * 60 * 60;
+
+    // POST rather than GET: a link password must not travel in a query
+    // string, where it would end up in server logs and browser history.
+    const downloadRes = await fetch(`${API_BASE}/generate-download-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({
+        objectKey,
+        expiresIn: expiresInSeconds,
+        fileName: uploaded.name,
+        // Stored on the link so the landing page can show what the recipient
+        // is about to download. /s/:id is public and has no session to look
+        // any of this up from.
+        fileSize: uploaded.size,
+        message: transferMode === 'EMAIL' ? message : '',
+        password: linkPassword || undefined,
+      }),
+    });
+
+    if (!downloadRes.ok) {
+      // The server's message is the useful one — it says things like
+      // "Passordet må ha minst 6 tegn." Throwing a generic string here meant
+      // a correct validation error arrived and was silently discarded.
+      const detail = await downloadRes.json().catch(() => ({}));
+      throw new Error(detail.error || 'Kunne ikke lage nedlastingslenke.');
+    }
+
+    const { downloadUrl: link } = await downloadRes.json();
+
+    setDownloadUrl(link);
+    setStatus('SUCCESS');
+
+    // The server recorded this against the account already; just refresh.
+    loadHistory();
+
+    if (transferMode === 'EMAIL' && emailTo && emailFrom) {
+      try {
+        await fetch(`${API_BASE}/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({
+            emailTo,
+            message,
+            downloadUrl: link,
+            fileName: uploaded.name,
+            requireReceipt,
+            // So the email can state the real expiry and mention the
+            // password, rather than assuming seven days and staying silent.
+            expiryDays: expiry,
+            hasPassword: Boolean(linkPassword),
+          }),
+        });
+        // Recipients are remembered server-side by /send-email.
+        fetchContacts();
+      } catch (emailErr) {
+        console.error('Email failed to send, but file was uploaded:', emailErr);
+        // Not an ERROR state: the upload itself worked.
+      }
+    }
+  };
+
+  /** Shared failure handling, so a batch reports as usefully as a single file. */
+  const handleUploadFailure = (err, subject) => {
+    // Cancelling isn't a failure — cancelTransfer has already returned us to IDLE.
+    if (err.aborted) return;
+
+    console.error(err);
+    reportError(err, `upload:${subject?.name || 'unknown'}`);
+
+    const outOfMemory = /allocat|memory|heap|RangeError/i.test(
+      `${err?.name || ''} ${err?.message || ''}`
+    );
+
+    setError(
+      outOfMemory
+        ? 'Maskinen gikk tom for minne under pakkingen. Prøv færre filer om gangen.'
+        : err.message
+    );
+    setStatus('ERROR');
+  };
+
+  /**
+   * Zips and uploads a multi-file selection in one pass.
+   *
+   * Shares everything after the upload with uploadFile — link creation, email,
+   * history — by handing it the object key and a stand-in file description.
+   */
+  const uploadBatch = async (selection) => {
+    setError('');
+    setStatus('UPLOADING');
+
+    try {
+      const startedAt = Date.now();
+      setProgress({ loaded: 0, total: selection.size, bytesPerSecond: 0 });
+
+      const { objectKey, size } = await uploadZipInParts(selection.items, {
+        fileName: selection.name,
+        authHeaders,
+        activeUploads: activeUploadsRef,
+        onProgress: (loaded, total) => {
+          const elapsed = (Date.now() - startedAt) / 1000;
+          setProgress({
+            loaded,
+            total,
+            bytesPerSecond: elapsed > 0.5 ? loaded / elapsed : 0,
+          });
+        },
+      });
+
+      await finishTransfer(objectKey, { name: selection.name, size });
+    } catch (uploadError) {
+      handleUploadFailure(uploadError, selection);
+    }
   };
 
   const uploadFile = async (fileToUpload) => {
@@ -542,73 +643,16 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
         });
       }
 
-      const expiresInSeconds = expiry * 24 * 60 * 60;
-      // POST rather than GET: a link password must not travel in a query
-      // string, where it would end up in server logs and browser history.
-      const downloadRes = await fetch(`${API_BASE}/generate-download-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          objectKey,
-          expiresIn: expiresInSeconds,
-          fileName: fileToUpload.name,
-          // Stored on the link so the landing page can show what the recipient
-          // is about to download. /s/:id is public and has no session to look
-          // any of this up from.
-          fileSize: fileToUpload.size,
-          message: transferMode === 'EMAIL' ? message : '',
-          password: linkPassword || undefined,
-        }),
-      });
-      if (!downloadRes.ok) {
-        // The server's message is the useful one — it says things like
-        // "Passordet må ha minst 6 tegn." Throwing a generic string here meant
-        // a correct validation error arrived and was silently discarded.
-        const detail = await downloadRes.json().catch(() => ({}));
-        throw new Error(detail.error || 'Kunne ikke lage nedlastingslenke.');
-      }
-      const { downloadUrl } = await downloadRes.json();
-
-      setDownloadUrl(downloadUrl);
-      setStatus('SUCCESS');
-
-      // The server recorded this against the account already; just refresh.
-      loadHistory();
-
-      // --- NEW EMAIL LOGIC ---
-      if (transferMode === 'EMAIL' && emailTo && emailFrom) {
-        try {
-          await fetch(`${API_BASE}/send-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...authHeaders() },
-            body: JSON.stringify({
-              emailTo,
-              message,
-              downloadUrl,
-              fileName: fileToUpload.name,
-              requireReceipt,
-              // So the email can state the real expiry and mention the
-              // password, rather than assuming seven days and staying silent.
-              expiryDays: expiry,
-              hasPassword: Boolean(linkPassword),
-            })
-          });
-          // Recipients are remembered server-side by /send-email.
-          fetchContacts();
-        } catch (emailErr) {
-          console.error("Email failed to send, but file was uploaded:", emailErr);
-          // We don't setStatus('ERROR') here because the file upload actually worked.
-        }
-      }
-      // -----------------------
-
+      await finishTransfer(objectKey, fileToUpload);
     } catch (err) {
-      // Cancelling isn't a failure — reset() has already returned us to IDLE.
-      if (err.aborted) return;
-      console.error(err);
-      setError(err.message);
-      setStatus('ERROR');
+      handleUploadFailure(err, fileToUpload);
     }
+  };
+
+  const startTransfer = async () => {
+    if (batch) return uploadBatch(batch);
+    if (!file) return;
+    return uploadFile(file);
   };
 
   const cancelTransfer = () => {
@@ -629,6 +673,7 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
 
   const reset = () => {
     setFile(null);
+    setBatch(null);
     setStatus('IDLE');
     setDownloadUrl('');
     setError('');
@@ -636,7 +681,6 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
     setMessage('');
     setLinkPassword('');
     setProgress({ loaded: 0, total: 0, bytesPerSecond: 0 });
-    setZipProgress(0);
     xhrRef.current = null;
   };
 
@@ -784,20 +828,36 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
                   data-dragging={isDragging}
                   className="dropzone cursor-pointer flex flex-1 flex-col items-center rounded-xl p-4 min-h-[150px] justify-center relative overflow-hidden"
                 >
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-3 transition-colors overflow-hidden ${file ? 'bg-mint text-ink' : 'bg-brand text-ink-deep'}`}>
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-3 transition-colors overflow-hidden ${selection ? 'bg-mint text-ink' : 'bg-brand text-ink-deep'}`}>
                     {file ? (
                       file.type.startsWith('image/') ? (
                         <img src={URL.createObjectURL(file)} alt="Forhåndsvisning" className="w-full h-full object-cover" />
                       ) : (
                         <FileCheck size={22} />
                       )
+                    ) : batch ? (
+                      <FileCheck size={22} />
                     ) : (
                       <Upload size={22} />
                     )}
                   </div>
-                  <h3 className="text-base font-medium text-sand mb-1">{file ? 'Fil valgt' : 'Slipp filer eller mapper her'}</h3>
+
+                  {/* A batch shows its count and total rather than a filename:
+                      the archive doesn't exist yet, since zipping now happens
+                      during the upload rather than on drop. */}
+                  <h3 className="text-base font-medium text-sand mb-1">
+                    {batch
+                      ? `${batch.items.length} filer valgt`
+                      : file
+                        ? 'Fil valgt'
+                        : 'Slipp filer eller mapper her'}
+                  </h3>
                   <p className="text-sand/50 text-xs text-center max-w-[220px] truncate">
-                    {file ? file.name : 'eller klikk for å bla gjennom'}
+                    {batch
+                      ? `${formatBytes(batch.size)} · pakkes som ${batch.name}`
+                      : file
+                        ? file.name
+                        : 'eller klikk for å bla gjennom'}
                   </p>
                   <input type="file" multiple className="hidden" onChange={handleFileSelect} />
                 </label>
@@ -957,9 +1017,9 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
 
                 <button
                   onClick={startTransfer}
-                  disabled={!file || passwordBlocks}
+                  disabled={!selection || passwordBlocks}
                   title={passwordBlocks ? 'Passordet er for kort' : undefined}
-                  className={`w-full mt-1 px-6 py-3 font-medium text-base rounded-xl transition-colors active:scale-[0.99] flex items-center justify-center gap-2 ${file && !passwordBlocks
+                  className={`w-full mt-1 px-6 py-3 font-medium text-base rounded-xl transition-colors active:scale-[0.99] flex items-center justify-center gap-2 ${selection && !passwordBlocks
                     ? 'bg-brand text-ink-deep hover:bg-brand/90'
                     : 'bg-sand/5 text-sand/40 cursor-not-allowed'
                     }`}
@@ -980,19 +1040,15 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
               transition={{ duration: 0.15 }}
               className="flex flex-col items-center w-full max-w-md"
             >
+              {/* Only shown while walking a dropped folder now. Compression
+                  happens during the upload, so there is no separate zip step
+                  and no percentage to report here — reading a directory gives
+                  no total to count against. */}
               <div className="w-14 h-14 rounded-xl bg-brand/10 flex items-center justify-center mb-4">
                 <Loader2 size={26} className="text-brand animate-spin" />
               </div>
-              <h3 className="text-lg font-medium text-sand mb-1">Komprimerer filer</h3>
-              <p className="text-sand/60 text-sm mb-5 text-center">Gjør klar en .zip-fil for overføring</p>
-
-              <div className="w-full bg-sand/5 h-1.5 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-brand transition-[width] duration-200"
-                  style={{ width: `${Math.round(zipProgress)}%` }}
-                />
-              </div>
-              <p className="text-sand/50 text-xs mt-2">{Math.round(zipProgress)} %</p>
+              <h3 className="text-lg font-medium text-sand mb-1">Leser mappen</h3>
+              <p className="text-sand/60 text-sm text-center">Finner filene som skal sendes</p>
             </motion.div>
           )}
 
@@ -1009,8 +1065,20 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
                 <Loader2 size={26} className="text-brand animate-spin" />
               </div>
 
-              <h3 className="text-lg font-medium text-sand mb-1">Overfører</h3>
-              <p className="text-sand/60 text-sm mb-5 truncate w-full text-center">{file?.name}</p>
+              {/* A batch has to produce its first 16 MB part before anything
+                  can be sent, which for a large selection means reading a lot
+                  from disk first. Saying so beats a progress bar sitting at
+                  0% looking stuck. */}
+              <h3 className="text-lg font-medium text-sand mb-1">
+                {batch && progress.loaded === 0 ? 'Forbereder overføringen' : 'Overfører'}
+              </h3>
+              <p className="text-sand/60 text-sm mb-5 truncate w-full text-center">
+                {batch
+                  ? progress.loaded === 0
+                    ? `Pakker ${batch.items.length} filer — dette kan ta et minutt`
+                    : batch.name
+                  : file?.name}
+              </p>
 
               <div className="w-full flex items-baseline justify-between mb-1.5">
                 <span className="text-2xl font-medium text-sand tabular-nums">{percent} %</span>
