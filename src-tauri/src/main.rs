@@ -34,6 +34,18 @@ fn main() {
             let version_i = MenuItem::with_id(app, "version", version_text, false, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
 
+            // macOS menu bar icons are template images: black plus alpha, with
+            // the system inverting them for light and dark menu bars. The full
+            // colour app icon can't do that, so it sat there looking like a
+            // sticker among the system icons.
+            //
+            // Windows and Linux get the normal coloured icon — a black glyph
+            // would vanish against the Windows taskbar.
+            #[cfg(target_os = "macos")]
+            let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-template.png"))
+                .expect("Could not read the tray template icon");
+
+            #[cfg(not(target_os = "macos"))]
             let icon = app.default_window_icon().cloned().expect("Could not find default icon");
 
             let menu = Menu::with_items(app, &[&show_i, &sep, &version_i, &quit_i])?;
@@ -41,6 +53,9 @@ fn main() {
             let _tray = TrayIconBuilder::new()
                 .tooltip("Drop Involve")
                 .icon(icon)
+                // Tells macOS to tint the icon to the menu bar instead of
+                // drawing it as artwork. A no-op on Windows and Linux.
+                .icon_as_template(true)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 // One behaviour, one click. The separate history panel this used
