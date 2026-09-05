@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Globe, History, LayoutGrid } from 'lucide-react';
 import UploadCard from './components/UploadCard';
@@ -9,7 +9,6 @@ import { API_BASE } from './lib/api';
 import { getVersion } from '@tauri-apps/api/app';
 import { enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { check } from '@tauri-apps/plugin-updater';
-import { ask } from '@tauri-apps/plugin-dialog';
 import { relaunch } from '@tauri-apps/plugin-process';
 
 // --- MAIN APP COMPONENT ---
@@ -24,6 +23,9 @@ const App = () => {
   // Only meaningful in the desktop app — the website is always whatever was
   // last deployed, so a version number there would just be noise.
   const [appVersion, setAppVersion] = useState('');
+  // Set by UploadCard while a transfer is running, so the updater doesn't
+  // restart the app out from under it.
+  const busyRef = useRef(false);
 
   /**
    * Back to the send screen.
@@ -47,6 +49,10 @@ const App = () => {
     setShowHistory(false);
     setShowContent((open) => !open);
   };
+
+  const handleBusyChange = useCallback((busy) => {
+    busyRef.current = busy;
+  }, []);
 
   const handleSignedIn = (payload) => setSession(saveSession(payload));
 
@@ -100,33 +106,56 @@ const App = () => {
     ensureAutostart();
   }, []);
 
-  // 1. UPDATER LOGIC
+  /**
+   * Updates, without anyone having to be told.
+   *
+   * This used to check once, three seconds after launch, and ask permission.
+   * Anyone who leaves the app open for a fortnight never saw the prompt, so
+   * keeping people current meant chasing them — half automatic, half manual.
+   *
+   * Now it checks on launch and every six hours, and installs on its own.
+   *
+   * The one thing it will not do is restart while the app is being used.
+   * Relaunching mid-transfer would lose the upload, and relaunching while
+   * someone is typing a recipient would lose that too. So a running app only
+   * updates when it is idle and not focused — left open in the background,
+   * which is exactly when nobody minds. Otherwise it waits for the next check.
+   *
+   * At launch there is nothing to lose, so it installs immediately.
+   */
   useEffect(() => {
-    const checkForUpdates = async () => {
+    let cancelled = false;
+
+    const applyUpdate = async ({ force }) => {
       try {
         const update = await check();
-        if (update) {
-          const yes = await ask(
-            `En ny versjon (${update.version}) er tilgjengelig. Vil du installere den nå?`,
-            {
-              title: 'Oppdatering tilgjengelig',
-              kind: 'info',
-              okLabel: 'Ja, oppdater',
-              cancelLabel: 'Senere'
-            }
-          );
+        if (!update || cancelled) return;
 
-          if (yes) {
-            await update.downloadAndInstall();
-            await relaunch();
-          }
+        // Busy means a transfer is running. Focused means someone is sitting
+        // in front of it, quite possibly mid-sentence.
+        if (!force && (busyRef.current || document.hasFocus())) {
+          console.log(`[updater] ${update.version} ready, waiting for an idle moment`);
+          return;
         }
+
+        console.log(`[updater] installing ${update.version}`);
+        await update.downloadAndInstall();
+        await relaunch();
       } catch (error) {
-        console.error("Update check failed:", error);
+        // No network, no release yet, or not running in Tauri at all — the
+        // browser has no updater and throws every time.
+        console.error('Update check failed:', error);
       }
     };
 
-    setTimeout(checkForUpdates, 3000);
+    const atLaunch = setTimeout(() => applyUpdate({ force: true }), 3000);
+    const periodic = setInterval(() => applyUpdate({ force: false }), 6 * 60 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(atLaunch);
+      clearInterval(periodic);
+    };
   }, []);
 
 
@@ -215,6 +244,7 @@ const App = () => {
             session={session}
             showHistory={showHistory}
             setShowHistory={setShowHistory}
+            onBusyChange={handleBusyChange}
           />
         )}
 

@@ -140,12 +140,15 @@ const putWithProgress = (url, file, { headers, onProgress, xhrRef }) =>
  * @param {{token: string, user: {email: string, name?: string}}} props.session
  *   Always present — App renders the sign-in screen instead when it isn't.
  * @param {boolean} props.showHistory
+ * @param {(busy: boolean) => void} [props.onBusyChange]
+ *   Lets App know a transfer is running, so the auto-updater doesn't restart
+ *   the desktop app in the middle of one.
  * @param {(open: boolean) => void} props.setShowHistory
  *   Owned by App because the button that opens the panel lives in the header —
  *   in the card it competed for width with the mode toggle and wrapped onto a
  *   second row under Windows display scaling.
  */
-const UploadCard = ({ session, showHistory, setShowHistory }) => {
+const UploadCard = ({ session, showHistory, setShowHistory, onBusyChange }) => {
   const [file, setFile] = useState(null);
   // A multi-file or folder selection, zipped during upload rather than on
   // drop: { items: [{file, path}], name, size }.
@@ -231,6 +234,11 @@ const UploadCard = ({ session, showHistory, setShowHistory }) => {
 
     return { level: 'ok', text: 'Del passordet med mottakeren på en annen måte enn e-post.' };
   })();
+
+  // Transfers survive a lot, but not the app restarting underneath them.
+  useEffect(() => {
+    onBusyChange?.(status === 'UPLOADING');
+  }, [status, onBusyChange]);
 
   const passwordBlocks = passwordIssue?.level === 'error';
   // Either a single file or a batch waiting to be zipped on send.

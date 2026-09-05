@@ -100,6 +100,28 @@ fn main() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|_app, _event| {
+            // Clicking the dock icon on macOS did nothing.
+            //
+            // Closing the window hides it to the tray rather than quitting, so
+            // the app is running with no visible windows. In that state macOS
+            // sends a "reopen" event rather than launching anything, and an app
+            // that ignores it simply looks dead — which is what was happening.
+            // Only the menu bar icon brought it back.
+            //
+            // Windows has no equivalent: clicking the taskbar button restores
+            // the window itself, which is why this was never seen there.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows, .. } = _event {
+                if !has_visible_windows {
+                    if let Some(window) = _app.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                }
+            }
+        });
 }
