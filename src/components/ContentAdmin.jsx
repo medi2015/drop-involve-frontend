@@ -21,7 +21,7 @@ const DEFAULTS = {
   caseColor: '#0B1416',
   ctaColor: '#003F48',
   caseTextColor: '#F8F5EC',
-  kickerColor: '#F8F5EC',
+  kickerColor: '#F5FF8C',
   taglineColor: '#003F46',
   caseOpacity: 0.75,
 };
@@ -352,7 +352,7 @@ const ContentAdmin = ({ session, onClose }) => {
                     {slide.kicker && (
                       <p
                         className="text-[11px] tracking-widest uppercase"
-                        style={{ color: slide.kickerColor || slide.tagColor || '#F5FF8C' }}
+                        style={{ color: slide.kickerColor || slide.tagColor || DEFAULTS.kickerColor }}
                       >
                         {slide.kicker}
                       </p>
