@@ -21,6 +21,7 @@ const DEFAULTS = {
   caseColor: '#0B1416',
   ctaColor: '#003F48',
   caseTextColor: '#F8F5EC',
+  kickerColor: '#F8F5EC',
   taglineColor: '#003F46',
   caseOpacity: 0.75,
 };
@@ -29,6 +30,7 @@ const blankSlide = () => ({
   id: `slide-${Date.now().toString(36)}`,
   enabled: true,
   kicker: '',
+  kickerColor: '',
   title: '',
   body: '',
   ctaLabel: '',
@@ -93,10 +95,18 @@ const Switch = ({ on, onChange, label = 'Vises for mottakere' }) => (
 
 const Colour = ({ label, value, fallback, onChange }) => (
   <div className="flex items-center gap-3 mb-2.5">
-    <span
-      className="w-7 h-7 rounded-md border border-sand/20 shrink-0"
-      style={{ background: value || fallback }}
-    />
+    <label className="relative cursor-pointer shrink-0" title="Klikk for fargevelger">
+      <span
+        className="block w-7 h-7 rounded-md border border-sand/20"
+        style={{ background: value || fallback }}
+      />
+      <input
+        type="color"
+        value={value || fallback}
+        onChange={(event) => onChange(event.target.value)}
+        className="sr-only"
+      />
+    </label>
     <span className="flex-1 text-sand/80 text-sm">{label}</span>
     <input
       type="text"
@@ -340,7 +350,12 @@ const ContentAdmin = ({ session, onClose }) => {
 
                   <div className="flex-1 min-w-0">
                     {slide.kicker && (
-                      <p className="text-brand text-[11px] tracking-widest uppercase">{slide.kicker}</p>
+                      <p
+                        className="text-[11px] tracking-widest uppercase"
+                        style={{ color: slide.kickerColor || slide.tagColor || '#F5FF8C' }}
+                      >
+                        {slide.kicker}
+                      </p>
                     )}
                     <p className="text-sand text-sm font-medium truncate">
                       {slide.title || slide.tagline || 'Uten tittel'}
@@ -589,6 +604,12 @@ const ContentAdmin = ({ session, onClose }) => {
           />
         ) : (
           <>
+            <Colour
+              label="Etikett / Kategori"
+              value={slide.kickerColor || slide.tagColor || ''}
+              fallback={DEFAULTS.kickerColor}
+              onChange={(value) => set({ kickerColor: value, tagColor: value })}
+            />
             <Colour
               label="Kort"
               value={slide.caseColor || ''}
