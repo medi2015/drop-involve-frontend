@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileCheck, Copy, Loader2, Link as LinkIcon,
   AlertCircle, X, Mail, MessageSquare, CheckCircle2,
-  Clock, Send, Lock, Trash2, History as HistoryIcon
+  Clock, Send, Lock, Trash2, History as HistoryIcon,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { API_BASE } from '../lib/api';
 import { uploadInParts, MULTIPART_THRESHOLD } from '../lib/multipart';
@@ -181,6 +182,7 @@ const UploadCard = ({ session, showHistory, setShowHistory, onBusyChange }) => {
   // is scoped per origin — tauri://localhost and drop.involve.no are separate
   // stores, so the two never matched.
   const [history, setHistory] = useState([]);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const [historyState, setHistoryState] = useState('loading'); // loading | ready | error
   const [confirmRevoke, setConfirmRevoke] = useState(null);
   const [revoking, setRevoking] = useState(null);
@@ -299,7 +301,10 @@ const UploadCard = ({ session, showHistory, setShowHistory, onBusyChange }) => {
   // Same for returning to the window, refreshed quietly so the list doesn't
   // flash a loading state at someone mid-read.
   useEffect(() => {
-    if (!showHistory) return;
+    if (!showHistory) {
+      setShowAllHistory(false);
+      return;
+    }
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchHistory();
@@ -495,6 +500,7 @@ const UploadCard = ({ session, showHistory, setShowHistory, onBusyChange }) => {
         fileSize: uploaded.size,
         message: transferMode === 'EMAIL' ? message : '',
         password: linkPassword || undefined,
+        recipientEmail: transferMode === 'EMAIL' && emailTo ? emailTo.trim() : undefined,
       }),
     });
 
@@ -533,6 +539,7 @@ const UploadCard = ({ session, showHistory, setShowHistory, onBusyChange }) => {
         });
         // Recipients are remembered server-side by /send-email.
         fetchContacts();
+        loadHistory();
       } catch (emailErr) {
         console.error('Email failed to send, but file was uploaded:', emailErr);
         // Not an ERROR state: the upload itself worked.
@@ -740,7 +747,7 @@ const UploadCard = ({ session, showHistory, setShowHistory, onBusyChange }) => {
                 <p className="text-sand/50 text-sm text-center py-8">Ingen overføringer ennå.</p>
               )}
 
-              {historyState === 'ready' && history.map((item) => (
+              {historyState === 'ready' && (showAllHistory ? history : history.slice(0, 10)).map((item) => (
                 <div key={item.id} className="surface-inset p-3 rounded-lg flex items-center gap-3 w-full">
                   <div className="overflow-hidden flex-1 min-w-0">
                     <p className="text-sand font-medium truncate text-sm">{item.fileName}</p>
@@ -748,10 +755,20 @@ const UploadCard = ({ session, showHistory, setShowHistory, onBusyChange }) => {
                       {formatWhen(item.createdAt)}
                       {item.hasPassword && ' · passordbeskyttet'}
                     </p>
-                    <p className={`text-xs mt-0.5 ${item.downloads ? 'text-mint' : 'text-sand/40'}`}>
-                      {!item.downloads && 'Ikke lastet ned ennå'}
-                      {item.downloads === 1 && 'Lastet ned 1 gang'}
-                      {item.downloads > 1 && `Lastet ned ${item.downloads} ganger`}
+                    <p className="text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      {item.recipientEmail && (
+                        <>
+                          <span className="text-sand/70 truncate max-w-[180px] sm:max-w-[260px]" title={`Sendt til ${item.recipientEmail}`}>
+                            Til: {item.recipientEmail}
+                          </span>
+                          <span className="text-sand/30">·</span>
+                        </>
+                      )}
+                      <span className={item.downloads ? 'text-mint' : 'text-sand/40'}>
+                        {!item.downloads && 'Ikke lastet ned ennå'}
+                        {item.downloads === 1 && 'Lastet ned 1 gang'}
+                        {item.downloads > 1 && `Lastet ned ${item.downloads} ganger`}
+                      </span>
                     </p>
                   </div>
 
@@ -796,6 +813,24 @@ const UploadCard = ({ session, showHistory, setShowHistory, onBusyChange }) => {
                   )}
                 </div>
               ))}
+
+              {historyState === 'ready' && history.length > 10 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllHistory((prev) => !prev)}
+                  className="w-full py-2.5 px-3 rounded-lg border border-sand/15 hover:border-sand/30 bg-sand/5 hover:bg-sand/10 text-sand/70 hover:text-sand text-xs font-medium transition-colors flex items-center justify-center gap-1.5 mt-2"
+                >
+                  {showAllHistory ? (
+                    <>
+                      <ChevronUp size={14} /> Skjul eldre historikk
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={14} /> Eldre historikk ({history.length - 10})
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         )}
