@@ -17,6 +17,15 @@ const formatWhen = (timestamp) =>
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 
+// Retain items in history for at most 14 days after their expiry date
+const RETENTION_AFTER_EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
+
+const isHistoryCurrent = (item) => {
+  const expiresAt = item.expiresAt || (item.createdAt ? item.createdAt + 7 * 24 * 60 * 60 * 1000 : 0);
+  if (!expiresAt) return true;
+  return Date.now() <= expiresAt + RETENTION_AFTER_EXPIRY_MS;
+};
+
 /**
  * Names a multi-file bundle after its first file plus a count, e.g.
  * "Rapport_og_3_flere.zip".
@@ -267,7 +276,8 @@ const UploadCard = ({ session, showHistory, setShowHistory, onBusyChange }) => {
       const res = await fetch(`${API_BASE}/history`, { headers: authHeaders() });
       if (!res.ok) throw new Error('Kunne ikke hente historikk.');
       const { items } = await res.json();
-      setHistory(Array.isArray(items) ? items : []);
+      const validItems = (Array.isArray(items) ? items : []).filter(isHistoryCurrent);
+      setHistory(validItems);
       setHistoryState('ready');
     } catch {
       setHistoryState('error');
